@@ -17,7 +17,7 @@ __url__ = "https://github.com/ivankravets/platformio-api"
 __author__ = "Ivan Kravets"
 __email__ = "me@ikravets.com"
 
-__license__ = "MIT Licence"
+__license__ = "MIT License"
 __copyright__ = "Copyright (C) 2014 Ivan Kravets"
 
 config = dict(
