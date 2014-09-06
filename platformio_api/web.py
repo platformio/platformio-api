@@ -50,7 +50,7 @@ def finalize_json_response(handler, kwargs):
 @app.route("/lib/search")
 def lib_search():
     args = dict(
-        query=unquote(request.query.query[:100]),
+        query=unquote(request.query.query[:255]),
         page=int(request.query.page) if request.query.page else 0,
         per_page=int(request.query.per_page) if request.query.per_page else 0
     )
