@@ -15,7 +15,7 @@ app = application = Bottle()
 
 
 @app.hook("after_request")
-def db_disconnet():
+def db_disconnect():
     db_session.close()
 
 
