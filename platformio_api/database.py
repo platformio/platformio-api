@@ -3,44 +3,14 @@
 
 import atexit
 
-from bottle import hook
-from sqlalchemy import create_engine, DDL, event, exc, literal
+from sqlalchemy import create_engine, DDL, event, literal
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.pool import Pool
+from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import ClauseElement
 
 from platformio_api import config
-
-engine = create_engine(config['SQLALCHEMY_DATABASE_URI'],
-                       pool_recycle=3600)
-engine.execute("SET time_zone = '+00:00'")
-
-db_session = scoped_session(
-    sessionmaker(autocommit=False, autoflush=False, bind=engine)
-)
-
-Base = declarative_base()
-Base.query = db_session.query_property()
-
-
-atexit.register(lambda: db_session.close())
-
-
-@event.listens_for(Pool, "checkout")
-def ping_connection(dbapi_connection, connection_record, connection_proxy):
-    cursor = dbapi_connection.cursor()
-    try:
-        cursor.execute("SELECT 1")
-    except:
-        raise exc.DisconnectionError()
-    cursor.close()
-
-
-@hook("after_request")
-def enable_cors():
-    db_session.remove()
 
 
 class Match(ClauseElement):
@@ -67,3 +37,18 @@ def sync_db():
     )
 
     Base.metadata.create_all(bind=engine)
+
+
+engine = create_engine(config['SQLALCHEMY_DATABASE_URI'],
+                       poolclass=NullPool)
+engine.execute("SET time_zone = '+00:00'")
+
+db_session = scoped_session(
+    sessionmaker(autocommit=False, autoflush=False, bind=engine)
+)
+
+Base = declarative_base()
+Base.query = db_session.query_property()
+
+
+atexit.register(lambda: db_session.close())
