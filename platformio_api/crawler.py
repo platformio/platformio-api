@@ -282,10 +282,10 @@ def process_pending_libs():
     query = db_session.query(models.PendingLibs, models.Libs.id).filter(
         ~models.PendingLibs.processed, models.PendingLibs.approved).outerjoin(
             models.Libs, models.PendingLibs.conf_url == models.Libs.conf_url)
-    try:
-        for (item, lib_id) in query.all():
-            if lib_id:
-                continue
+    for (item, lib_id) in query.all():
+        if lib_id:
+            continue
+        try:
             lib = models.Libs(conf_url=item.conf_url)
             lib.dlstats = models.LibDLStats(day=0, week=0, month=0)
             db_session.add(lib)
@@ -295,9 +295,9 @@ def process_pending_libs():
 
             item.processed = True
             db_session.commit()
-    except Exception as e:
-        db_session.rollback()
-        logger.exception(e)
+        except Exception as e:
+            db_session.rollback()
+            logger.exception(e)
 
 
 def sync_libs():
