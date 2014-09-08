@@ -10,7 +10,8 @@ from subprocess import check_call
 from requests import get
 
 from platformio_api import config
-from platformio_api.exception import DLFileError, DLFileSizeError
+from platformio_api.exception import (DLFileError, DLFileSizeError,
+                                      InvalidLibConf)
 
 
 def ip2int(ip_string):
@@ -89,3 +90,32 @@ def get_libexample_dir(id_):
 
 def get_libexample_url(id_):
     return "%s/%s" % (config['DL_PIO_URL'], get_libexample_relpath(id_))
+
+
+def validate_libconf(data):
+    fields = set(data.keys())
+    if not fields.issuperset(set(["name", "keywords", "description"])):
+        raise InvalidLibConf(
+            "The 'name, keywords and description' fields are required")
+
+    # if github-based project
+    if "repository" in data:
+        repo = data['repository']
+        if (repo.get("type", None) == "git" and
+                "github.com" in repo.get("url", None)):
+            return data
+
+    # if CVS-based
+    if "author" not in data or "name" not in data['author']:
+        raise InvalidLibConf("The 'author' field is required")
+    elif ("repository" in data and
+          data['repository'].get("type", None) in ("git", "svn")):
+        return data
+
+    # if self-hosted
+    if "version" not in data:
+        raise InvalidLibConf("The 'version' field is required")
+    elif "downloadUrl" not in data:
+        raise InvalidLibConf("The 'downloadUrl' field is required")
+
+    return data

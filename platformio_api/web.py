@@ -2,6 +2,7 @@
 # See LICENSE for details.
 
 import json
+import logging
 from urllib import unquote
 
 from bottle import Bottle, request, response
@@ -12,6 +13,7 @@ from platformio_api.exception import APIBadRequest, APINotFound
 
 
 app = application = Bottle()
+logger = logging.getLogger(__name__)
 
 
 @app.hook("after_request")
@@ -33,8 +35,10 @@ def finalize_json_response(handler, kwargs):
         status = 400
     except APINotFound as error:
         status = 404
-    except Exception as error:
+    except Exception as e:
         status = 500
+        error = "Internal server error"
+        logger.exception(e)
 
     if error:
         item = dict(
@@ -76,3 +80,9 @@ def lib_download(name):
 def lib_version(names):
     return finalize_json_response(api.LibVersionAPI,
                                   dict(names=names.split(",")))
+
+
+@app.route("/lib/register", method="POST")
+def lib_register():
+    return finalize_json_response(
+        api.LibRegisterAPI, dict(conf_url=request.forms.get("config_url")))

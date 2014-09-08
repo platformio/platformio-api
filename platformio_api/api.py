@@ -1,17 +1,19 @@
 # Copyright (C) Ivan Kravets <me@ikravets.com>
 # See LICENSE for details.
 
+import logging
 from datetime import datetime
 
+from requests import get
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
+from platformio_api import models
 from platformio_api.database import db_session, Match
-from platformio_api.exception import APIBadRequest, APINotFound
-from platformio_api.models import (Authors, Keywords, LibDLLog, LibDLStats,
-                                   LibExamples, LibFTS, Libs, LibsKeywords,
-                                   LibVersions)
-from platformio_api.util import get_libarch_url, ip2int
+from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
+from platformio_api.util import get_libarch_url, ip2int, validate_libconf
+
+logger = logging.getLogger(__name__)
 
 
 class APIBase(object):
@@ -113,31 +115,37 @@ class LibSearchAPI(APIBase):
         _authors, _keywords, _words = self.query
 
         if count:
-            query = db_session.query(func.count(distinct(LibFTS.lib_id)))
+            query = db_session.query(
+                func.count(distinct(models.LibFTS.lib_id))
+            )
         else:
-            query = db_session.query(LibFTS, Authors.name, LibDLStats.month,
-                                     Libs.example_nums)
+            query = db_session.query(
+                models.LibFTS, models.Authors.name, models.LibDLStats.month,
+                models.Libs.example_nums
+            )
 
-        query = query.join(Libs, Authors, LibDLStats)
+        query = query.join(models.Libs, models.Authors, models.LibDLStats)
 
         if _authors:
-            query = query.filter(Authors.name.in_(_authors))
+            query = query.filter(models.Authors.name.in_(_authors))
         # else:
         #     query = query.with_hint(Authors, "FORCE INDEX(PRIMARY)")
 
         if _keywords:
-            query = query.join(LibsKeywords).join(
-                Keywords, and_(Keywords.name.in_(_keywords), Keywords.id ==
-                               LibsKeywords.keyword_id))
+            query = query.join(models.LibsKeywords).join(
+                models.Keywords,
+                and_(models.Keywords.name.in_(_keywords),
+                     models.Keywords.id == models.LibsKeywords.keyword_id)
+            )
             if not count:
-                query = query.group_by(LibFTS.lib_id)
+                query = query.group_by(models.LibFTS.lib_id)
 
         if _words:
             query = query.filter(
-                Match([LibFTS.name, LibFTS.description, LibFTS.keywords],
-                      " ".join(_words)))
+                Match([models.LibFTS.name, models.LibFTS.description,
+                       models.LibFTS.keywords], " ".join(_words)))
         elif not count:
-            query = query.order_by(LibDLStats.month.desc())
+            query = query.order_by(models.LibDLStats.month.desc())
 
         return query
 
@@ -154,12 +162,13 @@ class LibInfoAPI(APIBase):
             version=dict()
         )
         query = db_session.query(
-            LibFTS, LibVersions, Authors, LibDLStats,
-            func.group_concat(LibExamples.name)).join(
-                Libs, Authors, LibDLStats).join(
-                LibVersions, LibVersions.id == Libs.latest_version_id
-                ).outerjoin(LibExamples).filter(
-            LibFTS.name == self.name).group_by(Libs.id)
+            models.LibFTS, models.LibVersions, models.Authors,
+            models.LibDLStats, func.group_concat(models.LibExamples.name)
+        ).join(models.Libs, models.Authors, models.LibDLStats).join(
+            models.LibVersions,
+            models.LibVersions.id == models.Libs.latest_version_id
+        ).outerjoin(models.LibExamples).filter(
+            models.LibFTS.name == self.name).group_by(models.Libs.id)
         try:
             data = query.one()
         except NoResultFound:
@@ -198,16 +207,21 @@ class LibDownloadAPI(APIBase):
     def get_result(self):
         if self.version:
             query = db_session.query(
-                LibFTS.lib_id, LibVersions.id, LibVersions.name).outerjoin(
-                    LibVersions, and_(LibVersions.lib_id == LibFTS.lib_id,
-                                      LibVersions.name == self.version)
-                ).filter(LibFTS.name == self.name)
+                models.LibFTS.lib_id, models.LibVersions.id,
+                models.LibVersions. name
+            ).outerjoin(
+                models.LibVersions,
+                and_(models.LibVersions.lib_id == models.LibFTS.lib_id,
+                     models.LibVersions.name == self.version)
+            ).filter(models.LibFTS.name == self.name)
         else:
             query = db_session.query(
-                LibFTS.lib_id, LibVersions.id, LibVersions.name).join(
-                Libs).join(LibVersions,
-                           LibVersions.id == Libs.latest_version_id).filter(
-                LibFTS.name == self.name)
+                models.LibFTS.lib_id, models.LibVersions.id,
+                models.LibVersions.name
+            ).join(models.Libs).join(
+                models.LibVersions,
+                models.LibVersions.id == models.Libs.latest_version_id
+            ).filter(models.LibFTS.name == self.name)
         try:
             data = query.one()
         except NoResultFound:
@@ -234,18 +248,19 @@ class LibDownloadAPI(APIBase):
 
         ip_int = ip2int(self.ip)
         try:
-            query = db_session.query(LibDLLog).filter(
-                LibDLLog.lib_id == lib_id, LibDLLog.ip == ip_int)
+            query = db_session.query(models.LibDLLog).filter(
+                models.LibDLLog.lib_id == lib_id, models.LibDLLog.ip == ip_int)
             item = query.one()
             item.date = datetime.utcnow()
         except NoResultFound:
-            db_session.query(LibDLStats).filter(
-                LibDLStats.lib_id == lib_id).update({
-                    LibDLStats.day: LibDLStats.day + 1,
-                    LibDLStats.week: LibDLStats.week + 1,
-                    LibDLStats.month: LibDLStats.month + 1
-                })
-            db_session.add(LibDLLog(lib_id=lib_id, ip=ip_int))
+            db_session.query(models.LibDLStats).filter(
+                models.LibDLStats.lib_id == lib_id
+            ).update({
+                models.LibDLStats.day: models.LibDLStats.day + 1,
+                models.LibDLStats.week: models.LibDLStats.week + 1,
+                models.LibDLStats.month: models.LibDLStats.month + 1
+            })
+            db_session.add(models.LibDLLog(lib_id=lib_id, ip=ip_int))
 
         db_session.commit()
 
@@ -259,11 +274,63 @@ class LibVersionAPI(APIBase):
     def get_result(self):
         result = dict()
         query = db_session.query(
-            LibFTS.name, LibVersions.name).join(Libs).join(
-                LibVersions, LibVersions.id == Libs.latest_version_id
-                ).filter(LibFTS.name.in_(self.names))
+            models.LibFTS.name, models.LibVersions.name
+        ).join(models.Libs).join(
+            models.LibVersions,
+            models.LibVersions.id == models.Libs.latest_version_id
+        ).filter(models.LibFTS.name.in_(self.names))
         result = {i[0]: i[1] for i in query.all()}
         for name in self.names:
             if name not in result:
                 result[name] = None
+        return result
+
+
+class LibRegisterAPI(APIBase):
+
+    def __init__(self, conf_url):
+        self.conf_url = conf_url.strip() if conf_url else None
+        if not self.conf_url:
+            raise APIBadRequest("Please specify the library configuration URL")
+
+    def get_result(self):
+        result = dict(
+            successed=False,
+            message=None
+        )
+
+        config = dict()
+        try:
+            r = get(self.conf_url)
+            try:
+                config = r.json()
+            except ValueError:
+                raise InvalidLibConf(self.conf_url)
+
+            # validate fields
+            config = validate_libconf(config)
+
+            # check for name duplicates
+            query = db_session.query(func.count(1)).filter(
+                models.LibFTS.name == config['name'])
+            if query.scalar():
+                raise InvalidLibConf("The library with name '%s' is already "
+                                     "registered" % config['name'])
+            # check for pending duplicates
+            query = db_session.query(func.count(1)).filter(
+                models.PendingLibs.conf_url == self.conf_url)
+            if query.scalar():
+                raise InvalidLibConf("The library is already registered")
+
+            db_session.add(models.PendingLibs(conf_url=self.conf_url))
+            db_session.commit()
+            result['successed'] = True
+            result['message'] = ("The library has been successfully "
+                                 "registered and is waiting for moderation")
+        except InvalidLibConf as e:
+            result['message'] = str(e)
+        except Exception as e:
+            logger.exception(e)
+            result['message'] = ("Could not retrieve a library JSON data by "
+                                 "this URL -> " + self.conf_url)
         return result

@@ -21,6 +21,7 @@ from platformio_api.cvsclient import CVSClientFactory
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
+from platformio_api.util import validate_libconf
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +33,11 @@ class LibSyncer(object):
         self.lib = lib
 
         try:
-            self.config = self.clean_dict(get(lib.conf_url).json())
+            self.config = self.clean_dict(
+                validate_libconf(get(lib.conf_url).json()))
             logger.debug("LibConf: %s" % self.config)
         except ValueError:
             raise InvalidLibConf(lib.conf_url)
-
-        if "name" not in self.config:
-            raise InvalidLibConf("Attribute 'name' is missed")
 
         self.cvsclient = None
         if "repository" in self.config:
