@@ -7,7 +7,7 @@ from urllib import unquote
 
 from bottle import Bottle, request, response
 
-from platformio_api import api
+from platformio_api import api, config
 from platformio_api.database import db_session
 from platformio_api.exception import APIBadRequest, APINotFound
 
@@ -23,6 +23,12 @@ def db_disconnect():
 
 def finalize_json_response(handler, kwargs):
     assert issubclass(handler, api.APIBase)
+    response.set_header("Access-Control-Allow-Origin",
+                        config['API_CORS_ORIGIN'])
+    response.set_header("Access-Control-Allow-Methods",
+                        "GET, POST, PUT, DELETE, OPTIONS")
+    response.set_header("Access-Control-Allow-Headers",
+                        "Content-Type, Access-Control-Allow-Headers")
     response.set_header("content-type", "application/json")
 
     status = 200
@@ -51,12 +57,24 @@ def finalize_json_response(handler, kwargs):
     return json.dumps(result)
 
 
+@app.route("/", method="OPTIONS")
+def cors(request):
+    """ Preflighted request """
+    response.set_header("Access-Control-Allow-Origin",
+                        config['API_CORS_ORIGIN'])
+    response.set_header("Access-Control-Allow-Methods",
+                        "GET, POST, PUT, DELETE, OPTIONS")
+    response.set_header("Access-Control-Allow-Headers",
+                        "Content-Type, Access-Control-Allow-Headers")
+    return None
+
+
 @app.route("/lib/search")
 def lib_search():
     args = dict(
         query=unquote(request.query.query[:255]),
         page=int(request.query.page) if request.query.page else 0,
-        per_page=int(request.query.per_page) if request.query.per_page else 0
+        # perpage=int(request.query.perpage) if request.query.perpage else 0
     )
     return finalize_json_response(api.LibSearchAPI, args)
 
