@@ -88,8 +88,9 @@ def get_libexample_dir(id_):
     return join(config['DL_PIO_DIR'], get_libexample_relpath(id_))
 
 
-def get_libexample_url(id_):
-    return "%s/%s" % (config['DL_PIO_URL'], get_libexample_relpath(id_))
+def get_libexample_url(id_, name):
+    return "%s/%s/%s" % (config['DL_PIO_URL'], get_libexample_relpath(id_),
+                         name)
 
 
 def validate_libconf(data):

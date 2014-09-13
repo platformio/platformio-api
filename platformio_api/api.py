@@ -11,7 +11,8 @@ from sqlalchemy.orm.exc import NoResultFound
 from platformio_api import models
 from platformio_api.database import db_session, Match
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
-from platformio_api.util import get_libarch_url, ip2int, validate_libconf
+from platformio_api.util import (get_libarch_url, get_libexample_url, ip2int,
+                                 validate_libconf)
 
 logger = logging.getLogger(__name__)
 
@@ -24,21 +25,21 @@ class APIBase(object):
 
 class LibSearchAPI(APIBase):
 
-    ITEMS_PER_PAGE = 50
+    ITEMS_PER_PAGE = 10
 
-    def __init__(self, query=None, page=1, per_page=50):
-        if not query:
-            raise APIBadRequest("Please specify '?query' parameter")
+    def __init__(self, query=None, page=1, perpage=None):
+        # if not query:
+        #     raise APIBadRequest("Please specify '?query' parameter")
         self.query = self._parse_query(query)
         self.page = page
-        self.per_page = per_page
+        self.perpage = perpage or self.ITEMS_PER_PAGE
 
         self.total = self.get_total()
 
-        if self.per_page < 1 or self.per_page > self.ITEMS_PER_PAGE:
-            self.per_page = self.ITEMS_PER_PAGE
+        if self.perpage < 1 or self.perpage > self.ITEMS_PER_PAGE:
+            self.perpage = self.ITEMS_PER_PAGE
 
-        if self.page < 1 or ((self.page - 1) * self.per_page) > self.total:
+        if self.page < 1 or ((self.page - 1) * self.perpage) > self.total:
             self.page = 1
 
     def get_total(self):
@@ -46,12 +47,13 @@ class LibSearchAPI(APIBase):
 
     def get_result(self):
         items = []
-        query = self._prepare_sqlquery().limit(self.per_page).offset(
-            (self.page - 1) * self.per_page)
+        query = self._prepare_sqlquery().limit(self.perpage).offset(
+            (self.page - 1) * self.perpage)
 
         for data in query.all():
             fts, author_name, dlmonth, example_nums = data
             items.append(dict(
+                id=fts.lib_id,
                 name=fts.name,
                 description=fts.description,
                 keywords=[k.strip() for k in fts.keywords.split(",")],
@@ -62,6 +64,7 @@ class LibSearchAPI(APIBase):
         return dict(
             total=self.total,
             page=self.page,
+            perpage=self.perpage,
             items=items
         )
 
@@ -186,12 +189,15 @@ class LibInfoAPI(APIBase):
         for k in ("day", "week", "month"):
             result['dlstats'][k] = getattr(data[3], k)
 
-        result['examples'] = data[4].split(",") if data[4] else []
+        result['examples'] = []
+        if data[4]:
+            for name in data[4].split(","):
+                result['examples'].append(get_libexample_url(lib_id, name))
 
         # latest version
         result['version'] = dict(
             name=data[1].name,
-            released=data[1].released.strftime("%Y-%m-%dT%H:%M:%S")
+            released=data[1].released.strftime("%Y-%m-%dT%H:%M:%SZ")
         )
 
         return result
