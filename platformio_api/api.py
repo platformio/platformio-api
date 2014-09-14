@@ -340,3 +340,64 @@ class LibRegisterAPI(APIBase):
             result['message'] = ("Could not retrieve a library JSON data by "
                                  "this URL -> " + self.conf_url)
         return result
+
+
+class LibStatsAPI(APIBase):
+
+    def get_result(self):
+        result = dict(
+            updated=self._get_last_updated(),
+            added=self._get_last_added(),
+            keywords=self._get_last_keywords(),
+            dlday=self._get_most_downloaded(models.LibDLStats.day),
+            dlweek=self._get_most_downloaded(models.LibDLStats.week),
+            dlmonth=self._get_most_downloaded(models.LibDLStats.month)
+        )
+        return result
+
+    def _get_last_updated(self, limit=5):
+        items = []
+        query = db_session.query(
+            models.Libs.updated, models.LibFTS.name
+        ).join(models.LibFTS).order_by(models.Libs.updated.desc()).limit(limit)
+        for item in query.all():
+            items.append(dict(
+                name=item[1],
+                date=item[0].strftime("%Y-%m-%dT%H:%M:%SZ")
+            ))
+        return items
+
+    def _get_last_added(self, limit=5):
+        items = []
+        query = db_session.query(
+            models.Libs.updated, models.LibFTS.name
+        ).join(models.LibFTS).order_by(models.Libs.id.desc()).limit(limit)
+        for item in query.all():
+            items.append(dict(
+                name=item[1],
+                date=item[0].strftime("%Y-%m-%dT%H:%M:%SZ")
+            ))
+        return items
+
+    def _get_last_keywords(self, limit=5):
+        items = []
+        query = db_session.query(
+            models.Keywords.name
+        ).order_by(models.Keywords.id.desc()).limit(limit)
+        for item in query.all():
+            items.append(item[0])
+        return items
+
+    def _get_most_downloaded(self, period, limit=5):
+        items = []
+        query = db_session.query(
+            period, models.LibFTS.name
+        ).join(
+            models.LibFTS, models.LibDLStats.lib_id == models.LibFTS.lib_id
+        ).order_by(period.desc()).limit(limit)
+        for item in query.all():
+            items.append(dict(
+                name=item[1],
+                total=item[0]
+            ))
+        return items

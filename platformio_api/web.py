@@ -104,3 +104,8 @@ def lib_version(names):
 def lib_register():
     return finalize_json_response(
         api.LibRegisterAPI, dict(conf_url=request.forms.get("config_url")))
+
+
+@app.route("/lib/stats")
+def lib_stats():
+    return finalize_json_response(api.LibStatsAPI, {})
