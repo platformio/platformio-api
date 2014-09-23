@@ -26,6 +26,8 @@ def download_file(source_url, destination_path):
     CHUNK_SIZE = 1024
     downloaded = 0
 
+    f = None
+    r = None
     try:
         r = get(source_url, stream=True)
         if r.status_code != 200:
@@ -33,7 +35,7 @@ def download_file(source_url, destination_path):
                 r.status_code, source_url))
         if int(r.headers.get("content-length", 0)) > config['MAX_DLFILE_SIZE']:
             raise DLFileSizeError(config['MAX_DLFILE_SIZE'],
-                                  r.headers['content-length'])
+                                  int(r.headers['content-length']))
 
         f = open(destination_path, "wb")
         for data in r.iter_content(chunk_size=CHUNK_SIZE):
@@ -42,8 +44,10 @@ def download_file(source_url, destination_path):
             f.write(data)
             downloaded += CHUNK_SIZE
     finally:
-        f.close()
-        r.close()
+        if f:
+            f.close()
+        if r:
+            r.close()
 
 
 def create_archive(archive_path, source_dir):

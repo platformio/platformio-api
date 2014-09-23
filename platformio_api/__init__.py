@@ -26,7 +26,7 @@ config = dict(
     GITHUB_PASSWORD=None,
     DL_PIO_DIR=None,
     DL_PIO_URL=None,
-    MAX_DLFILE_SIZE=1024*1024,
+    MAX_DLFILE_SIZE=1024*1024*2,
     LOGGING=dict(version=1)
 )
 

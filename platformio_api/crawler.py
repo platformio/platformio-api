@@ -87,9 +87,9 @@ class LibSyncer(object):
 
         config_sha1 = self.calc_config_sha1()
         if self.lib.conf_sha1 == config_sha1:
-            logger.info("Library is up-to-date")
             return True
         else:
+            logger.info("Library is out-date")
             self.lib.conf_sha1 = config_sha1
 
         try:
@@ -243,12 +243,17 @@ class LibSyncer(object):
             assert isfile(archive_path)
 
             # fetch examples
+            exmglobs = self.config.get("examples", None)
             exmfiles = []
-            for item in listdir(archdir):
-                if item.lower() not in ("example", "examples"):
-                    continue
-                for fmask in ("*.ino", "*.pde"):
-                    exmfiles += glob(join(archdir, item, "*", fmask))
+            if exmglobs is None:
+                for ext in ("*.ino", "*.pde"):
+                    exmfiles += glob(join(archdir, "[Ee]xamples", "*", ext))
+            else:
+                if not isinstance(exmglobs, list):
+                    exmglobs = [exmglobs]
+                for fmask in exmglobs:
+                    exmfiles += glob(join(srcdir, fmask))
+
             self.sync_examples(exmfiles)
         finally:
             rmtree(archdir)
