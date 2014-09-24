@@ -89,7 +89,7 @@ class LibSyncer(object):
         if self.lib.conf_sha1 == config_sha1:
             return True
         else:
-            logger.info("Library is out-date")
+            logger.info("Library #%d is out-of-date", self.lib.id)
             self.lib.conf_sha1 = config_sha1
 
         try:
@@ -104,7 +104,7 @@ class LibSyncer(object):
         self.lib.latest_version_id = version.id
         self.lib.updated = datetime.utcnow()
 
-        # update author info)
+        # update author info
         self.sync_author()
 
         # FTS & keywords
@@ -309,7 +309,6 @@ def sync_libs():
         models.Libs.synced < datetime.utcnow() - timedelta(days=1))
     for item in query.all():
         try:
-            logger.info("Synchronize library #%d" % item.id)
             ls = LibSyncer(item)
             if ls.sync():
                 item.synced = datetime.utcnow()

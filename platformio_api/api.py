@@ -153,6 +153,73 @@ class LibSearchAPI(APIBase):
         return query
 
 
+class LibExamplesAPI(LibSearchAPI):
+
+    ITEMS_PER_PAGE = 5
+
+    def get_result(self):
+        items = []
+        query = self._prepare_sqlquery().limit(self.perpage).offset(
+            (self.page - 1) * self.perpage)
+
+        for data in query.all():
+            example, fts, author_name = data
+            lib_id = example.lib_id
+            items.append(dict(
+                id=example.id,
+                name=example.name,
+                url=get_libexample_url(lib_id, example.name),
+                lib=dict(
+                    id=lib_id,
+                    name=fts.name,
+                    description=fts.description,
+                    keywords=[k.strip() for k in fts.keywords.split(",")]
+                ),
+                author_name=author_name
+            ))
+        return dict(
+            total=self.total,
+            page=self.page,
+            perpage=self.perpage,
+            items=items
+        )
+
+    def _prepare_sqlquery(self, count=False):
+        _authors, _keywords, _words = self.query
+
+        if count:
+            query = db_session.query(
+                func.count(distinct(models.LibExamples.id))
+            )
+        else:
+            query = db_session.query(
+                models.LibExamples, models.LibFTS, models.Authors.name
+            )
+
+        query = query.join(models.Libs, models.LibFTS, models.Authors)
+
+        if _authors:
+            query = query.filter(models.Authors.name.in_(_authors))
+
+        if _keywords:
+            query = query.join(models.LibsKeywords).join(
+                models.Keywords,
+                and_(models.Keywords.name.in_(_keywords),
+                     models.Keywords.id == models.LibsKeywords.keyword_id)
+            )
+            if not count:
+                query = query.group_by(models.LibFTS.lib_id)
+
+        if _words:
+            query = query.filter(
+                Match([models.LibFTS.name, models.LibFTS.description,
+                       models.LibFTS.keywords], " ".join(_words)))
+        elif not count:
+            query = query.order_by(models.LibExamples.id.desc())
+
+        return query
+
+
 class LibInfoAPI(APIBase):
 
     def __init__(self, name):
