@@ -207,8 +207,6 @@ class LibExamplesAPI(LibSearchAPI):
                 and_(models.Keywords.name.in_(_keywords),
                      models.Keywords.id == models.LibsKeywords.keyword_id)
             )
-            if not count:
-                query = query.group_by(models.LibFTS.lib_id)
 
         if _words:
             query = query.filter(
