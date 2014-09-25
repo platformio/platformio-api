@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from glob import glob
 from hashlib import sha1
 from os import listdir, makedirs, remove
-from os.path import basename, dirname, isdir, isfile, join
+from os.path import basename, dirname, isdir, isfile, join, splitext
 from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
 
@@ -252,8 +252,9 @@ class LibSyncer(object):
                 if not isinstance(exmglobs, list):
                     exmglobs = [exmglobs]
                 for fmask in exmglobs:
-                    exmfiles += glob(join(srcdir, fmask))
-
+                    exmfiles += glob(
+                        join(archdir if inclist is None else srcdir, fmask)
+                    )
             self.sync_examples(exmfiles)
         finally:
             rmtree(archdir)
