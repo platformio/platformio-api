@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from glob import glob
 from hashlib import sha1
 from os import listdir, makedirs, remove
-from os.path import basename, dirname, isdir, isfile, join, splitext
+from os.path import basename, dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
 
@@ -89,7 +89,7 @@ class LibSyncer(object):
         if self.lib.conf_sha1 == config_sha1:
             return True
         else:
-            logger.info("Library #%d is out-of-date", self.lib.id)
+            logger.info("Library is out-of-date: %s", self.lib.conf_url)
             self.lib.conf_sha1 = config_sha1
 
         try:
