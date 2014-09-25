@@ -25,7 +25,7 @@ class Authors(Base):
     __tablename__ = "authors"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(String(20), nullable=False, unique=True)
+    name = Column(String(30), nullable=False, unique=True)
     email = Column(String(50))
     url = Column(String(100))
 
