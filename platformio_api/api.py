@@ -2,6 +2,7 @@
 # See LICENSE for details.
 
 import logging
+import re
 from datetime import datetime
 
 from requests import get
@@ -30,7 +31,7 @@ class LibSearchAPI(APIBase):
     def __init__(self, query=None, page=1, perpage=None):
         # if not query:
         #     raise APIBadRequest("Please specify '?query' parameter")
-        self.query = self._parse_query(query)
+        self.query = self.parse_query(query)
         self.page = page
         self.perpage = perpage or self.ITEMS_PER_PAGE
 
@@ -68,7 +69,7 @@ class LibSearchAPI(APIBase):
             items=items
         )
 
-    def _parse_query(self, query):
+    def parse_query(self, query):
         authors = []
         keywords = []
         words = []
@@ -114,6 +115,9 @@ class LibSearchAPI(APIBase):
         else:
             return (authors, keywords, words)
 
+    def escape_fts_query(self, query):
+        return re.sub(r"(([\+\-\~\<\>]([^\w]|$))|(\*{2,}))", r'"\1"', query)
+
     def _prepare_sqlquery(self, count=False):
         _authors, _keywords, _words = self.query
 
@@ -144,9 +148,10 @@ class LibSearchAPI(APIBase):
                 query = query.group_by(models.LibFTS.lib_id)
 
         if _words:
+            fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords], " ".join(_words)))
+                       models.LibFTS.keywords], fts_query))
         elif not count:
             query = query.order_by(models.LibDLStats.month.desc())
 
@@ -209,9 +214,10 @@ class LibExamplesAPI(LibSearchAPI):
             )
 
         if _words:
+            fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords], " ".join(_words)))
+                       models.LibFTS.keywords], fts_query))
         elif not count:
             query = query.order_by(models.LibExamples.id.desc())
 
