@@ -97,7 +97,7 @@ class LibExamples(Base):
     id = Column(INTEGER(unsigned=True), primary_key=True)
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
                     nullable=False)
-    name = Column(String(30))
+    name = Column(String(100))
 
 
 class LibDLLog(Base):
