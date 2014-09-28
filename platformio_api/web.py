@@ -12,7 +12,7 @@ from platformio_api.database import db_session
 from platformio_api.exception import APIBadRequest, APINotFound
 
 
-app = application = Bottle()
+app = Bottle()
 logger = logging.getLogger(__name__)
 
 
