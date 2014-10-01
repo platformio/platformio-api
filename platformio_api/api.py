@@ -264,6 +264,7 @@ class LibInfoAPI(APIBase):
         if data[4]:
             for name in data[4].split(","):
                 result['examples'].append(get_libexample_url(lib_id, name))
+            result['examples'].sort(key=lambda v: v.upper())
 
         # latest version
         result['version'] = dict(
