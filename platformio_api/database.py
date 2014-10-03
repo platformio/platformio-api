@@ -32,8 +32,8 @@ def sync_db():
     event.listen(
         LibFTS.__table__,
         "after_create",
-        DDL("ALTER TABLE %s ADD FULLTEXT(name, description, keywords)" %
-            LibFTS.__tablename__)
+        DDL("ALTER TABLE %s ADD FULLTEXT(name, description, keywords, "
+            "examplefiles)" % LibFTS.__tablename__)
     )
 
     Base.metadata.create_all(bind=engine)

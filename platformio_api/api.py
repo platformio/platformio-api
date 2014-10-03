@@ -52,12 +52,13 @@ class LibSearchAPI(APIBase):
             (self.page - 1) * self.perpage)
 
         for data in query.all():
-            fts, author_name, dlmonth, example_nums = data
+            (lib_id, lib_name, lib_description, lib_keywords,
+             author_name, dlmonth, example_nums) = data
             items.append(dict(
-                id=fts.lib_id,
-                name=fts.name,
-                description=fts.description,
-                keywords=[k.strip() for k in fts.keywords.split(",")],
+                id=lib_id,
+                name=lib_name,
+                description=lib_description,
+                keywords=lib_keywords.split(","),
                 author_name=author_name,
                 dlmonth=dlmonth,
                 example_nums=example_nums
@@ -127,7 +128,9 @@ class LibSearchAPI(APIBase):
             )
         else:
             query = db_session.query(
-                models.LibFTS, models.Authors.name, models.LibDLStats.month,
+                models.LibFTS.lib_id, models.LibFTS.name,
+                models.LibFTS.description, models.LibFTS.keywords,
+                models.Authors.name, models.LibDLStats.month,
                 models.Libs.example_nums
             )
 
@@ -151,7 +154,8 @@ class LibSearchAPI(APIBase):
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords], fts_query))
+                       models.LibFTS.keywords, models.LibFTS.examplefiles],
+                      fts_query))
         elif not count:
             query = query.order_by(models.LibDLStats.month.desc())
 
@@ -168,7 +172,8 @@ class LibExamplesAPI(LibSearchAPI):
             (self.page - 1) * self.perpage)
 
         for data in query.all():
-            example, fts, author_name = data
+            (example, lib_name, lib_description, lib_keywords,
+             author_name) = data
             lib_id = example.lib_id
             items.append(dict(
                 id=example.id,
@@ -176,9 +181,9 @@ class LibExamplesAPI(LibSearchAPI):
                 url=get_libexample_url(lib_id, example.name),
                 lib=dict(
                     id=lib_id,
-                    name=fts.name,
-                    description=fts.description,
-                    keywords=[k.strip() for k in fts.keywords.split(",")]
+                    name=lib_name,
+                    description=lib_description,
+                    keywords=lib_keywords.split(",")
                 ),
                 author_name=author_name
             ))
@@ -198,7 +203,9 @@ class LibExamplesAPI(LibSearchAPI):
             )
         else:
             query = db_session.query(
-                models.LibExamples, models.LibFTS, models.Authors.name
+                models.LibExamples, models.LibFTS.name,
+                models.LibFTS.description, models.LibFTS.keywords,
+                models.Authors.name
             )
 
         query = query.join(models.Libs, models.LibFTS, models.Authors)
@@ -217,7 +224,8 @@ class LibExamplesAPI(LibSearchAPI):
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords], fts_query))
+                       models.LibFTS.keywords, models.LibFTS.examplefiles],
+                      fts_query))
         elif not count:
             query = query.order_by(models.LibExamples.id.desc())
 
@@ -237,12 +245,11 @@ class LibInfoAPI(APIBase):
         )
         query = db_session.query(
             models.LibFTS, models.LibVersions, models.Authors,
-            models.LibDLStats, func.group_concat(models.LibExamples.name)
+            models.LibDLStats
         ).join(models.Libs, models.Authors, models.LibDLStats).join(
             models.LibVersions,
             models.LibVersions.id == models.Libs.latest_version_id
-        ).outerjoin(models.LibExamples).filter(
-            models.LibFTS.name == self.name).group_by(models.Libs.id)
+        ).filter(models.LibFTS.name == self.name)
         try:
             data = query.one()
         except NoResultFound:
@@ -253,7 +260,7 @@ class LibInfoAPI(APIBase):
         result['id'] = lib_id
         for k in ("name", "description"):
             result[k] = getattr(data[0], k)
-        result['keywords'] = [k.strip() for k in data[0].keywords.split(",")]
+        result['keywords'] = data[0].keywords.split(",")
 
         for k in ("name", "email", "url"):
             result['author'][k] = getattr(data[2], k)
@@ -261,10 +268,9 @@ class LibInfoAPI(APIBase):
             result['dlstats'][k] = getattr(data[3], k)
 
         result['examples'] = []
-        if data[4]:
-            for name in data[4].split(","):
+        for name in data[0].examplefiles.split(","):
+            if name:
                 result['examples'].append(get_libexample_url(lib_id, name))
-            result['examples'].sort(key=lambda v: v.upper())
 
         # latest version
         result['version'] = dict(
@@ -286,7 +292,7 @@ class LibDownloadAPI(APIBase):
         if self.version:
             query = db_session.query(
                 models.LibFTS.lib_id, models.LibVersions.id,
-                models.LibVersions. name
+                models.LibVersions.name
             ).outerjoin(
                 models.LibVersions,
                 and_(models.LibVersions.lib_id == models.LibFTS.lib_id,

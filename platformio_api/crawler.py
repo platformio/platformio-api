@@ -114,7 +114,7 @@ class LibSyncer(object):
         self.lib.fts.description = self.config.get("description", None)
         self.sync_keywords(self.config.get("keywords", []))
 
-        # archive current version of library
+        # archive current library version
         self.archive()
 
         return True
@@ -161,7 +161,7 @@ class LibSyncer(object):
                 self.lib.keywords.append(models.Keywords(name=item))
 
         # save in string format for FTS
-        self.lib.fts.keywords = ", ".join(keywords)
+        self.lib.fts.keywords = ",".join(keywords)
 
     def _clean_keywords(self, keywords):
         result = []
@@ -281,6 +281,8 @@ class LibSyncer(object):
             usednames.append(name)
 
         self.lib.example_nums = len(usednames)
+        usednames.sort(key=lambda v: v.upper())
+        self.lib.fts.examplefiles = ",".join(usednames)
 
 
 def process_pending_libs():

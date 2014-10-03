@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, String,
+from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, String, Text,
                         UniqueConstraint)
 from sqlalchemy.dialects.mysql import INTEGER, SMALLINT
 from sqlalchemy.orm import relationship
@@ -78,6 +78,7 @@ class LibFTS(Base):
     name = Column(String(50), unique=True, nullable=False)
     description = Column(String(255))
     keywords = Column(String(255))
+    examplefiles = Column(Text())
 
 
 class LibVersions(Base):
