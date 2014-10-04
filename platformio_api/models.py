@@ -76,9 +76,9 @@ class LibFTS(Base):
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
                     primary_key=True)
     name = Column(String(50), unique=True, nullable=False)
-    description = Column(String(255))
-    keywords = Column(String(255))
-    examplefiles = Column(Text())
+    description = Column(String(255), nullable=False)
+    keywords = Column(String(255), nullable=False)
+    examplefiles = Column(Text(), nullable=False)
 
 
 class LibVersions(Base):
