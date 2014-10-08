@@ -53,7 +53,7 @@ class LibSearchAPI(APIBase):
 
         for data in query.all():
             (lib_id, lib_name, lib_description, lib_keywords,
-             author_name, dlmonth, example_nums) = data
+             author_name, dlmonth, example_nums, updated) = data
             items.append(dict(
                 id=lib_id,
                 name=lib_name,
@@ -61,7 +61,8 @@ class LibSearchAPI(APIBase):
                 keywords=lib_keywords.split(","),
                 author_name=author_name,
                 dlmonth=dlmonth,
-                example_nums=example_nums
+                example_nums=example_nums,
+                updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")
             ))
         return dict(
             total=self.total,
@@ -131,7 +132,7 @@ class LibSearchAPI(APIBase):
                 models.LibFTS.lib_id, models.LibFTS.name,
                 models.LibFTS.description, models.LibFTS.keywords,
                 models.Authors.name, models.LibDLStats.month,
-                models.Libs.example_nums
+                models.Libs.example_nums, models.Libs.updated
             )
 
         query = query.join(models.Libs, models.Authors, models.LibDLStats)
