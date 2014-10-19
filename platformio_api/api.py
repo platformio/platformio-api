@@ -31,7 +31,7 @@ class LibSearchAPI(APIBase):
     def __init__(self, query=None, page=1, perpage=None):
         # if not query:
         #     raise APIBadRequest("Please specify '?query' parameter")
-        self.query = self.parse_query(query)
+        self.search_query = self.parse_search_query(query)
         self.page = page
         self.perpage = perpage or self.ITEMS_PER_PAGE
 
@@ -44,24 +44,27 @@ class LibSearchAPI(APIBase):
             self.page = 1
 
     def get_total(self):
-        return self._prepare_sqlquery(count=True).scalar()
+        return self._prepare_sql_query(count=True).scalar()
 
     def get_result(self):
         items = []
-        query = self._prepare_sqlquery().limit(self.perpage).offset(
+        query = self._prepare_sql_query().limit(self.perpage).offset(
             (self.page - 1) * self.perpage)
 
         for data in query.all():
             (lib_id, lib_name, lib_description, lib_keywords,
-             author_name, dlmonth, example_nums, updated) = data
+             authornames, dlmonth, example_nums, updated,
+             frameworkslist, platformslist) = data
             items.append(dict(
                 id=lib_id,
                 name=lib_name,
                 description=lib_description,
                 keywords=lib_keywords.split(","),
-                author_name=author_name,
+                authornames=authornames.split(","),
+                frameworks=self.parse_namedtitled_list(frameworkslist),
+                platforms=self.parse_namedtitled_list(platformslist),
                 dlmonth=dlmonth,
-                example_nums=example_nums,
+                examplenums=example_nums,
                 updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")
             ))
         return dict(
@@ -71,58 +74,89 @@ class LibSearchAPI(APIBase):
             items=items
         )
 
-    def parse_query(self, query):
-        authors = []
-        keywords = []
-        words = []
+    def parse_namedtitled_list(self, ntlist):
+        items = []
+        for item in ntlist.split(","):
+            if ":" in item:
+                items.append(item.split(":")[0])
+        return items
 
-        _quote = "\""
-        _author = None
-        _keyword = None
+    def parse_search_query(self, query):
+        quote = "\""
+        words = []
+        params = {
+            "authors": [],
+            "keywords": [],
+            "frameworks": [],
+            "platforms": []
+        }
+        state = {key: None for key in params.keys()}
 
         for token in query.split(" "):
+            token_used = False
             token = token.strip()
             if not len(token):
                 continue
-            if _author is not None:
-                _author += " %s" % token
-            elif _keyword is not None:
-                _keyword += " %s" % token
-            elif token.startswith("author:"):
-                _author = token[7:]
-            elif token.startswith("keyword:"):
-                _keyword = token[8:]
-            else:
+
+            # if parameter's value consists from multiple words
+            for s in state.keys():
+                if state[s] is not None:
+                    state[s] += " %s" % token
+                    token_used = True
+                    break
+
+            # if new parameter
+            for s in state.keys():
+                if token.startswith("%s:" % s[:-1]):
+                    state[s] = token[len(s):]
+                    token_used = True
+                    break
+
+            if not token_used:
                 words.append(token)
 
-            if _author:
-                if not _author.startswith(_quote):
-                    authors.append(_author)
-                    _author = None
-                elif _author.startswith(_quote) and _author.endswith(_quote):
-                    authors.append(_author[1:-1])
-                    _author = None
+            # check if value is completed
+            for s in state.keys():
+                if state[s] is None:
+                    continue
+                if not state[s].startswith(quote):
+                    params[s].append(state[s])
+                    state[s] = None
+                elif state[s].startswith(quote) and state[s].endswith(quote):
+                    params[s].append(state[s][1:-1])
+                    state[s] = None
 
-            if _keyword:
-                if not _keyword.startswith(_quote):
-                    keywords.append(_keyword)
-                    _keyword = None
-                elif _keyword.startswith(_quote) and _keyword.endswith(_quote):
-                    keywords.append(_keyword[1:-1])
-                    _keyword = None
-
-        # invalid query
-        if _author or _keyword:
-            return ([], [], [i.strip() for i in query.split(" ") if len(i)])
+        # if invalid query
+        if all([v is None for v in state.values()]):
+            return {"params": params, "words": words}
         else:
-            return (authors, keywords, words)
+            return {"params": None,
+                    "words": [i.strip() for i in query.split(" ") if len(i)]}
+
+    def make_fts_words_strict(self, words):
+        items = []
+        stop = False
+        for word in words:
+            if "(" in word:
+                stop = True
+
+            if word[0] not in "+-<>()~*":
+                if "-" in word:
+                    word = '"%s"' % word
+                if not stop:
+                    word = "+" + word
+
+            if ")" in word:
+                stop = False
+
+            items.append(word)
+        return items
 
     def escape_fts_query(self, query):
-        return re.sub(r"(([\+\-\~\<\>]([^\w]|$))|(\*{2,}))", r'"\1"', query)
+        return re.sub(r"(([\+\-\~\<\>]([^\w\(\"]|$))|(\*{2,}))", r'"\1"',
+                      query)
 
-    def _prepare_sqlquery(self, count=False):
-        _authors, _keywords, _words = self.query
-
+    def _prepare_sql_query(self, count=False):
         if count:
             query = db_session.query(
                 func.count(distinct(models.LibFTS.lib_id))
@@ -131,34 +165,52 @@ class LibSearchAPI(APIBase):
             query = db_session.query(
                 models.LibFTS.lib_id, models.LibFTS.name,
                 models.LibFTS.description, models.LibFTS.keywords,
-                models.Authors.name, models.LibDLStats.month,
-                models.Libs.example_nums, models.Libs.updated
+                models.LibFTS.authornames, models.LibDLStats.month,
+                models.Libs.example_nums, models.Libs.updated,
+                models.LibFTS.frameworkslist, models.LibFTS.platformslist
             )
 
-        query = query.join(models.Libs, models.Authors, models.LibDLStats)
+        query = query.join(models.Libs, models.LibDLStats)
 
+        # Relationship Way
+        _authors = self.search_query['params']['authors']
         if _authors:
-            query = query.filter(models.Authors.name.in_(_authors))
-        # else:
-        #     query = query.with_hint(Authors, "FORCE INDEX(PRIMARY)")
-
-        if _keywords:
-            query = query.join(models.LibsKeywords).join(
-                models.Keywords,
-                and_(models.Keywords.name.in_(_keywords),
-                     models.Keywords.id == models.LibsKeywords.keyword_id)
+            query = query.join(models.LibsAuthors).join(
+                models.Authors,
+                and_(models.Authors.name.in_(_authors),
+                     models.Authors.id == models.LibsAuthors.author_id)
             )
-            if not count:
-                query = query.group_by(models.LibFTS.lib_id)
+        #
+        # if _params['keywords']:
+        #     query = query.join(models.LibsKeywords).join(
+        #         models.Keywords,
+        #         and_(models.Keywords.name.in_(_params['keywords']),
+        #              models.Keywords.id == models.LibsKeywords.keyword_id)
+        #     )
+        #
+        if not count and _authors:
+            query = query.group_by(models.LibFTS.lib_id)
+
+        # Cached FTS Way
+        _words = self.make_fts_words_strict(self.search_query['words'])
+
+        if self.search_query['params']:
+            for key, items in self.search_query['params'].iteritems():
+                if not items or key == "authors":
+                    continue
+                _words.append('+("%s")' % '" "'.join(items))
 
         if _words:
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords, models.LibFTS.examplefiles],
+                       models.LibFTS.keywords, models.LibFTS.examplefiles,
+                       models.LibFTS.authornames, models.LibFTS.frameworkslist,
+                       models.LibFTS.platformslist],
                       fts_query))
         elif not count:
-            query = query.order_by(models.LibDLStats.month.desc())
+            query = query.order_by(models.LibDLStats.month.desc(),
+                                   models.LibFTS.name)
 
         return query
 
@@ -169,12 +221,12 @@ class LibExamplesAPI(LibSearchAPI):
 
     def get_result(self):
         items = []
-        query = self._prepare_sqlquery().limit(self.perpage).offset(
+        query = self._prepare_sql_query().limit(self.perpage).offset(
             (self.page - 1) * self.perpage)
 
         for data in query.all():
             (example, lib_name, lib_description, lib_keywords,
-             author_name) = data
+             authornames, frameworkslist, platformslist) = data
             lib_id = example.lib_id
             items.append(dict(
                 id=example.id,
@@ -184,9 +236,11 @@ class LibExamplesAPI(LibSearchAPI):
                     id=lib_id,
                     name=lib_name,
                     description=lib_description,
-                    keywords=lib_keywords.split(",")
-                ),
-                author_name=author_name
+                    keywords=lib_keywords.split(","),
+                    authornames=authornames.split(","),
+                    frameworks=self.parse_namedtitled_list(frameworkslist),
+                    platforms=self.parse_namedtitled_list(platformslist)
+                )
             ))
         return dict(
             total=self.total,
@@ -195,37 +249,37 @@ class LibExamplesAPI(LibSearchAPI):
             items=items
         )
 
-    def _prepare_sqlquery(self, count=False):
-        _authors, _keywords, _words = self.query
+    def _prepare_sql_query(self, count=False):
+        _params, _words = self.search_query
 
         if count:
-            query = db_session.query(
-                func.count(distinct(models.LibExamples.id))
-            )
+            query = db_session.query(func.count(models.LibExamples.id))
         else:
             query = db_session.query(
                 models.LibExamples, models.LibFTS.name,
                 models.LibFTS.description, models.LibFTS.keywords,
-                models.Authors.name
+                models.LibFTS.authornames, models.LibFTS.frameworkslist,
+                models.LibFTS.platformslist
             )
 
-        query = query.join(models.Libs, models.LibFTS, models.Authors)
+        query = query.join(models.Libs, models.LibFTS)
 
-        if _authors:
-            query = query.filter(models.Authors.name.in_(_authors))
+        # Cached FTS Way (the relationship way described above in the Search)
+        _words = self.make_fts_words_strict(self.search_query['words'])
 
-        if _keywords:
-            query = query.join(models.LibsKeywords).join(
-                models.Keywords,
-                and_(models.Keywords.name.in_(_keywords),
-                     models.Keywords.id == models.LibsKeywords.keyword_id)
-            )
+        if self.search_query['params']:
+            for items in self.search_query['params'].values():
+                if not items:
+                    continue
+                _words.append('+("%s")' % '" "'.join(items))
 
         if _words:
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords, models.LibFTS.examplefiles],
+                       models.LibFTS.keywords, models.LibFTS.examplefiles,
+                       models.LibFTS.authornames, models.LibFTS.frameworkslist,
+                       models.LibFTS.platformslist],
                       fts_query))
         elif not count:
             query = query.order_by(models.LibExamples.id.desc())
@@ -235,82 +289,96 @@ class LibExamplesAPI(LibSearchAPI):
 
 class LibInfoAPI(APIBase):
 
-    def __init__(self, name):
-        self.name = name.strip()
+    def __init__(self, id_):
+        self.id_ = id_
 
     def get_result(self):
         result = dict(
-            author=dict(),
+            authors=[],
             dlstats=dict(),
-            version=dict()
+            version=dict(),
+            examples=[],
+            frameworks={},
+            platforms={}
         )
         query = db_session.query(
-            models.LibFTS, models.LibVersions, models.Authors,
-            models.LibDLStats
-        ).join(models.Libs, models.Authors, models.LibDLStats).join(
+            models.Libs, models.LibFTS, models.LibDLStats, models.LibVersions
+        ).join(models.LibFTS, models.LibDLStats).join(
             models.LibVersions,
             models.LibVersions.id == models.Libs.latest_version_id
-        ).filter(models.LibFTS.name == self.name)
+        ).filter(models.Libs.id == self.id_)
         try:
             data = query.one()
         except NoResultFound:
-            raise APINotFound("Unknown library with name '%s'" % self.name)
+            raise APINotFound("Unknown library with ID '%s'" % str(self.id_))
 
-        lib_id = data[0].lib_id
+        lib_id = data[0].id
 
         result['id'] = lib_id
         for k in ("name", "description"):
-            result[k] = getattr(data[0], k)
-        result['keywords'] = data[0].keywords.split(",")
+            result[k] = getattr(data[1], k)
+        result['keywords'] = data[1].keywords.split(",")
 
-        for k in ("name", "email", "url"):
-            result['author'][k] = getattr(data[2], k)
         for k in ("day", "week", "month"):
-            result['dlstats'][k] = getattr(data[3], k)
+            result['dlstats'][k] = getattr(data[2], k)
 
-        result['examples'] = []
-        for name in data[0].examplefiles.split(","):
+        # examples
+        for name in data[1].examplefiles.split(","):
             if name:
                 result['examples'].append(get_libexample_url(lib_id, name))
 
         # latest version
         result['version'] = dict(
-            name=data[1].name,
-            released=data[1].released.strftime("%Y-%m-%dT%H:%M:%SZ")
+            name=data[3].name,
+            released=data[3].released.strftime("%Y-%m-%dT%H:%M:%SZ")
         )
+
+        # authors
+        for item in data[0].authors:
+            _author = {}
+            for k in ("name", "email", "url", "maintainer"):
+                _author[k] = getattr(item, k)
+            result['authors'].append(_author)
+
+        # frameworks & platforms
+        for what in ("frameworks", "platforms"):
+            result[what] = []
+            _list = getattr(data[1], what + "list").split(",")
+            for l in _list:
+                if ":" in l:
+                    result[what].append(l.split(":")[0])
 
         return result
 
 
 class LibDownloadAPI(APIBase):
 
-    def __init__(self, name, ip=None, version=None):
-        self.name = name.strip()
+    def __init__(self, id_, ip=None, version=None):
+        self.id_ = id_
         self.ip = ip
         self.version = version.strip() if version else None
 
     def get_result(self):
         if self.version:
             query = db_session.query(
-                models.LibFTS.lib_id, models.LibVersions.id,
-                models.LibVersions.name
+                models.Libs.id,
+                models.LibVersions.id, models.LibVersions.name
             ).outerjoin(
                 models.LibVersions,
-                and_(models.LibVersions.lib_id == models.LibFTS.lib_id,
+                and_(models.LibVersions.lib_id == models.Libs.id,
                      models.LibVersions.name == self.version)
-            ).filter(models.LibFTS.name == self.name)
+            ).filter(models.Libs.id == self.id_)
         else:
             query = db_session.query(
-                models.LibFTS.lib_id, models.LibVersions.id,
-                models.LibVersions.name
-            ).join(models.Libs).join(
+                models.Libs.id, models.LibVersions.id, models.LibVersions.name
+            ).join(
                 models.LibVersions,
                 models.LibVersions.id == models.Libs.latest_version_id
-            ).filter(models.LibFTS.name == self.name)
+            ).filter(models.Libs.id == self.id_)
         try:
             data = query.one()
         except NoResultFound:
-            raise APINotFound("Unknown library with name '%s'" % self.name)
+            raise APINotFound("Unknown library with ID '%d'" % self.id_)
 
         lib_id = data[0]
         version_id = data[1]
@@ -322,7 +390,7 @@ class LibDownloadAPI(APIBase):
         self._logdlinfo(lib_id)
 
         result = dict(
-            url=get_libarch_url(lib_id, self.name, version_name),
+            url=get_libarch_url(lib_id, version_id),
             version=version_name
         )
         return result
@@ -352,22 +420,19 @@ class LibDownloadAPI(APIBase):
 
 class LibVersionAPI(APIBase):
 
-    def __init__(self, names):
-        self.names = names
-        assert isinstance(names, list)
+    def __init__(self, ids):
+        self.ids = ids
+        assert isinstance(ids, list)
 
     def get_result(self):
         result = dict()
         query = db_session.query(
-            models.LibFTS.name, models.LibVersions.name
-        ).join(models.Libs).join(
-            models.LibVersions,
-            models.LibVersions.id == models.Libs.latest_version_id
-        ).filter(models.LibFTS.name.in_(self.names))
+            models.LibVersions.lib_id, models.LibVersions.name
+        ).filter(models.LibVersions.lib_id.in_(self.ids))
         result = {i[0]: i[1] for i in query.all()}
-        for name in self.names:
-            if name not in result:
-                result[name] = None
+        for id_ in self.ids:
+            if id_ not in result:
+                result[id_] = None
         return result
 
 
@@ -396,11 +461,12 @@ class LibRegisterAPI(APIBase):
             config = validate_libconf(config)
 
             # check for name duplicates
-            query = db_session.query(func.count(1)).filter(
-                models.LibFTS.name == config['name'])
-            if query.scalar():
-                raise InvalidLibConf("The library with name '%s' is already "
-                                     "registered" % config['name'])
+            # query = db_session.query(func.count(1)).filter(
+            #     models.LibFTS.name == config['name'])
+            # if query.scalar():
+            #     raise InvalidLibConf("The library with name '%s' is already "
+            #                          "registered" % config['name'])
+
             # check for pending duplicates
             query = db_session.query(func.count(1)).filter(
                 models.PendingLibs.conf_url == self.conf_url)
@@ -437,24 +503,26 @@ class LibStatsAPI(APIBase):
     def _get_last_updated(self, limit=5):
         items = []
         query = db_session.query(
-            models.Libs.updated, models.LibFTS.name
+            models.Libs.id, models.Libs.updated, models.LibFTS.name
         ).join(models.LibFTS).order_by(models.Libs.updated.desc()).limit(limit)
         for item in query.all():
             items.append(dict(
-                name=item[1],
-                date=item[0].strftime("%Y-%m-%dT%H:%M:%SZ")
+                id=item[0],
+                name=item[2],
+                date=item[1].strftime("%Y-%m-%dT%H:%M:%SZ")
             ))
         return items
 
     def _get_last_added(self, limit=5):
         items = []
         query = db_session.query(
-            models.Libs.updated, models.LibFTS.name
+            models.Libs.id, models.Libs.updated, models.LibFTS.name
         ).join(models.LibFTS).order_by(models.Libs.id.desc()).limit(limit)
         for item in query.all():
             items.append(dict(
-                name=item[1],
-                date=item[0].strftime("%Y-%m-%dT%H:%M:%SZ")
+                id=item[0],
+                name=item[2],
+                date=item[1].strftime("%Y-%m-%dT%H:%M:%SZ")
             ))
         return items
 
@@ -470,13 +538,14 @@ class LibStatsAPI(APIBase):
     def _get_most_downloaded(self, period, limit=5):
         items = []
         query = db_session.query(
-            period, models.LibFTS.name
+            period, models.LibFTS.lib_id, models.LibFTS.name
         ).join(
             models.LibFTS, models.LibDLStats.lib_id == models.LibFTS.lib_id
         ).order_by(period.desc()).limit(limit)
         for item in query.all():
             items.append(dict(
-                name=item[1],
+                id=item[1],
+                name=item[2],
                 total=item[0]
             ))
         return items

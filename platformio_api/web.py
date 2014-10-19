@@ -89,25 +89,25 @@ def lib_examples():
     return finalize_json_response(api.LibExamplesAPI, args)
 
 
-@app.route("/lib/info/<name>")
-def lib_info(name):
-    return finalize_json_response(api.LibInfoAPI, dict(name=name[:50]))
+@app.route("/lib/info/<id_>")
+def lib_info(id_):
+    return finalize_json_response(api.LibInfoAPI, dict(id_=id_))
 
 
-@app.route("/lib/download/<name>")
-def lib_download(name):
+@app.route("/lib/download/<id_:int>")
+def lib_download(id_):
     args = dict(
-        name=name,
+        id_=id_,
         version=request.query.version,
         ip=request.remote_addr
     )
     return finalize_json_response(api.LibDownloadAPI, args)
 
 
-@app.route("/lib/version/<names>")
-def lib_version(names):
-    return finalize_json_response(api.LibVersionAPI,
-                                  dict(names=names.split(",")))
+@app.route("/lib/version/<ids:re:\d+(,\d+)*>")
+def lib_version(ids):
+    ids = [int(i) for i in ids.split(",")[:50]]
+    return finalize_json_response(api.LibVersionAPI, dict(ids=ids))
 
 
 @app.route("/lib/register", method="POST")

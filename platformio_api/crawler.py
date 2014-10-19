@@ -33,8 +33,9 @@ class LibSyncer(object):
         self.lib = lib
 
         try:
+            self.config_origin = get(lib.conf_url).text
             self.config = self.clean_dict(
-                validate_libconf(get(lib.conf_url).json()))
+                validate_libconf(json.loads(self.config_origin)))
             logger.debug("LibConf: %s" % self.config)
         except ValueError:
             raise InvalidLibConf(lib.conf_url)
@@ -47,12 +48,11 @@ class LibSyncer(object):
                 self.cvsclient = CVSClientFactory.newClient(_type, _url)
 
     def clean_dict(self, data):
-        for key in data.keys():
-            if isinstance(data[key], dict):
-                self.clean_dict(data[key])
-            elif isinstance(data[key], list):
-                data[key] = [i.strip() for i in data[key]]
-            else:
+        for (key, _) in (data.iteritems() if isinstance(data, dict) else
+                         enumerate(data)):
+            if isinstance(data[key], dict) or isinstance(data[key], list):
+                data[key] = self.clean_dict(data[key])
+            elif isinstance(data[key], basestring):
                 data[key] = data[key].strip()
         return data
 
@@ -88,10 +88,39 @@ class LibSyncer(object):
         config_sha1 = self.calc_config_sha1()
         if self.lib.conf_sha1 == config_sha1:
             return True
-        else:
-            logger.info("Library is out-of-date: %s", self.lib.conf_url)
-            self.lib.conf_sha1 = config_sha1
 
+        logger.info("Library is out-of-date: %s", self.lib.conf_url)
+        self.lib.conf_sha1 = config_sha1
+        self.lib.updated = datetime.utcnow()
+
+        # update versions data
+        self.lib.latest_version_id = self.sync_version(version)
+
+        # FTS defaults
+        if self.lib.fts is None:
+            self.lib.fts = models.LibFTS(name=self.config['name'])
+        self.lib.fts.name = self.config['name']
+        self.lib.fts.description = self.config.get("description", None)
+
+        # update authors data wit new from conf or CVS
+        self.config['authors'] = self.sync_authors(
+            self.config.get("authors", None))
+        self.config['keywords'] = self.sync_keywords(
+            self.config.get("keywords", []))
+        self.config['frameworks'] = self.sync_frameworks_or_platforms(
+            "frameworks", self.config.get("frameworks", []))
+        self.config['platforms'] = self.sync_frameworks_or_platforms(
+            "platforms", self.config.get("platforms", []))
+
+        # store library registry ID
+        self.config['id'] = self.lib.id
+
+        # archive current library version
+        self.archive()
+
+        return self.config['id']
+
+    def sync_version(self, version):
         try:
             version = (db_session.query(models.LibVersions).filter(
                 models.LibVersions.lib_id == self.lib.id,
@@ -100,49 +129,49 @@ class LibSyncer(object):
             version = models.LibVersions(**version)
             self.lib.versions.append(version)
             db_session.flush()
+        return version.id
 
-        self.lib.latest_version_id = version.id
-        self.lib.updated = datetime.utcnow()
-
-        # update author info
-        self.sync_author()
-
-        # FTS & keywords
-        if self.lib.fts is None:
-            self.lib.fts = models.LibFTS(name=self.config['name'])
-        self.lib.fts.name = self.config['name']
-        self.lib.fts.description = self.config.get("description", None)
-        self.sync_keywords(self.config.get("keywords", []))
-
-        # archive current library version
-        self.archive()
-
-        return True
-
-    def sync_author(self):
-        data = dict(
-            name=None,
+    def sync_authors(self, confauthors):
+        authors = []
+        itemtpl = dict(
             email=None,
-            url=None
+            url=None,
+            maintainer=False
         )
-        if "author" in self.config and "name" in self.config['author']:
-            data['name'] = self.config['author']['name']
-            data['email'] = self.config['author'].get("email", None)
-            data['url'] = self.config['author'].get("url", None)
+        if confauthors:
+            if not isinstance(confauthors, list):
+                confauthors = [confauthors]
+            for item in confauthors:
+                tmp = itemtpl.copy()
+                tmp.update(item)
+                authors.append(tmp)
         elif self.cvsclient and self.cvsclient.get_type() == "github":
-            data = self.cvsclient.get_owner()
-            self.config['author'] = data
+            tmp = itemtpl.copy()
+            tmp.update(self.cvsclient.get_owner())
+            authors.append(tmp)
         else:
-            return
+            raise NotImplementedError()
 
-        try:
-            author = (db_session.query(models.Authors).filter(
-                models.Authors.name == data['name']).one())
-            author.email = data['email']
-            author.url = data['url']
-        except NoResultFound:
-            author = models.Authors(**data)
-        self.lib.author = author
+        authornames = [item['name'] for item in authors]
+
+        # delete obsolete authors
+        self.lib.authors = []
+
+        query = db_session.query(models.Authors).filter(
+            models.Authors.name.in_(authornames))
+        existing = set()
+        for item in query.all():
+            existing.add(item.name)
+            self.lib.authors.append(item)
+
+        for name in (set(authornames) - existing):
+            for item in authors:
+                if item['name'] == name:
+                    self.lib.authors.append(models.Authors(**item))
+
+        # save in string format for FTS
+        self.lib.fts.authornames = ",".join(authornames)
+        return authors
 
     def sync_keywords(self, keywords):
         keywords = self._clean_keywords(keywords)
@@ -150,18 +179,19 @@ class LibSyncer(object):
         # delete obsolete keywords
         self.lib.keywords = []
 
-        existing = db_session.query(models.Keywords).filter(
-            models.Keywords.name.in_(keywords)).all()
-        existingnames = set()
-        for item in existing:
-            existingnames.add(item.name)
+        query = db_session.query(models.Keywords).filter(
+            models.Keywords.name.in_(keywords))
+        existing = set()
+        for item in query.all():
+            existing.add(item.name)
             self.lib.keywords.append(item)
 
-        for item in (set(keywords) - existingnames):
+        for item in (set(keywords) - existing):
                 self.lib.keywords.append(models.Keywords(name=item))
 
         # save in string format for FTS
         self.lib.fts.keywords = ",".join(keywords)
+        return keywords
 
     def _clean_keywords(self, keywords):
         result = []
@@ -172,6 +202,28 @@ class LibSyncer(object):
             if len(item) and item not in result:
                 result.append(item)
         return result
+
+    def sync_frameworks_or_platforms(self, what, items):
+        assert what in ("frameworks", "platforms")
+        if not isinstance(items, list):
+            items = [i.strip().lower() for i in items.split(",")]
+
+        dbitems = []
+        if items:
+            _model = getattr(models, what.title())
+            dbitems = db_session.query(_model).filter(
+                _model.name.in_(items)).all()
+
+        # assert if invalid items
+        assert len(items) == len(dbitems)
+        # update items in DB
+        setattr(self.lib, what, dbitems)
+        # save in string format for FTS
+        setattr(self.lib.fts, what + "list", ",".join([
+            "%s:%s" % (item.name, item.title) for item in dbitems
+        ]))
+
+        return items
 
     def archive(self):
         archdir = mkdtemp()
@@ -227,15 +279,16 @@ class LibSyncer(object):
                         else:
                             copytree(itempath, dstpath)
 
-            # put library.json
-            with open(join(archdir, "library.json"), "w") as f:
+            # put original library.json & modified .library.json
+            with open(join(archdir, ".library.json"), "w") as f:
                 json.dump(self.config, f, indent=4)
+            with open(join(archdir, "library.json"), "w") as f:
+                f.write(self.config_origin)
 
             # pack lib's files
             archive_path = util.get_libarch_path(
                 self.lib.id,
-                self.config['name'],
-                self.config['version']
+                self.lib.latest_version_id
             )
             if not isdir(dirname(archive_path)):
                 makedirs(dirname(archive_path))

@@ -21,6 +21,13 @@ class PendingLibs(Base):
     processed = Column(Boolean, nullable=False, default=False)
 
 
+class Attributes(Base):
+    __tablename__ = "attributes"
+
+    id = Column(INTEGER(unsigned=True), primary_key=True)
+    name = Column(String(20), unique=True, nullable=False)
+
+
 class Authors(Base):
     __tablename__ = "authors"
 
@@ -28,6 +35,15 @@ class Authors(Base):
     name = Column(String(30), nullable=False, unique=True)
     email = Column(String(50))
     url = Column(String(100))
+    maintainer = Column(Boolean, nullable=False, default=False)
+
+
+class Frameworks(Base):
+    __tablename__ = "frameworks"
+
+    id = Column(INTEGER(unsigned=True), primary_key=True)
+    name = Column(String(20), unique=True, nullable=False)
+    title = Column(String(20), nullable=False)
 
 
 class Keywords(Base):
@@ -37,18 +53,10 @@ class Keywords(Base):
     name = Column(String(20), unique=True, nullable=False)
 
 
-class Attributes(Base):
-    __tablename__ = "attributes"
-
-    id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(String(20), unique=True, nullable=False)
-
-
 class Libs(Base):
     __tablename__ = "libs"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    author_id = Column(INTEGER(unsigned=True), ForeignKey("authors.id"))
     latest_version_id = Column(INTEGER(unsigned=True))
     conf_url = Column(String(200), nullable=False)
     conf_sha1 = Column(String(40))
@@ -57,48 +65,49 @@ class Libs(Base):
                      index=True)
     synced = Column(DateTime, nullable=False, default=datetime.utcnow())
 
-    author = relationship("Authors", uselist=False, lazy="joined",
-                          backref="libs")
-    fts = relationship("LibFTS", uselist=False, lazy="joined", cascade="all")
-    versions = relationship("LibVersions", cascade="all")
-    examples = relationship("LibExamples", cascade="all,delete-orphan")
-    dllog = relationship("LibDLLog", cascade="all")
-    dlstats = relationship("LibDLStats", uselist=False, cascade="all")
+    # relationships
     attributes = relationship("Attributes", secondary="libs_attributes",
                               cascade="all")
+    authors = relationship("Authors", secondary="libs_authors", cascade="all")
+    examples = relationship("LibExamples", cascade="all,delete-orphan")
+    frameworks = relationship("Frameworks", secondary="libs_frameworks",
+                              cascade="all")
+    fts = relationship("LibFTS", uselist=False, lazy="joined", cascade="all")
+    dllog = relationship("LibDLLog", cascade="all")
+    dlstats = relationship("LibDLStats", uselist=False, cascade="all")
     keywords = relationship("Keywords", secondary="libs_keywords",
                             cascade="all")
+    platforms = relationship("Platforms", secondary="libs_platforms",
+                             cascade="all")
+    versions = relationship("LibVersions", cascade="all")
 
 
-class LibFTS(Base):
-    __tablename__ = "lib_fts"
+class LibsAttributes(Base):
+    __tablename__ = "libs_attributes"
 
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
                     primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
-    description = Column(String(255), nullable=False)
-    keywords = Column(String(255), nullable=False)
-    examplefiles = Column(Text(), nullable=False)
+    attribute_id = Column(INTEGER(unsigned=True), ForeignKey("attributes.id"),
+                          primary_key=True)
+    value = Column(String(100), nullable=False)
 
 
-class LibVersions(Base):
-    __tablename__ = "lib_versions"
-    __table_args__ = (UniqueConstraint("lib_id", "name"),)
+class LibsAuthors(Base):
+    __tablename__ = "libs_authors"
 
-    id = Column(INTEGER(unsigned=True), primary_key=True)
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
-                    nullable=False)
-    name = Column(String(20))
-    released = Column(DateTime, nullable=False, default=datetime.utcnow())
+                    primary_key=True)
+    author_id = Column(INTEGER(unsigned=True), ForeignKey("authors.id"),
+                       primary_key=True)
 
 
-class LibExamples(Base):
-    __tablename__ = "lib_examples"
+class LibsFrameworks(Base):
+    __tablename__ = "libs_frameworks"
 
-    id = Column(INTEGER(unsigned=True), primary_key=True)
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
-                    nullable=False)
-    name = Column(String(100))
+                    primary_key=True)
+    framework_id = Column(INTEGER(unsigned=True), ForeignKey("frameworks.id"),
+                          primary_key=True)
 
 
 class LibDLLog(Base):
@@ -120,14 +129,27 @@ class LibDLStats(Base):
     month = Column(INTEGER(unsigned=True), nullable=False, index=True)
 
 
-class LibsAttributes(Base):
-    __tablename__ = "libs_attributes"
+class LibExamples(Base):
+    __tablename__ = "lib_examples"
+
+    id = Column(INTEGER(unsigned=True), primary_key=True)
+    lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
+                    nullable=False)
+    name = Column(String(100))
+
+
+class LibFTS(Base):
+    __tablename__ = "lib_fts"
 
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
                     primary_key=True)
-    attribute_id = Column(INTEGER(unsigned=True), ForeignKey("attributes.id"),
-                          primary_key=True)
-    value = Column(String(100), nullable=False)
+    name = Column(String(50), nullable=False)
+    description = Column(String(255), nullable=False)
+    keywords = Column(String(255), nullable=False)
+    examplefiles = Column(Text(), nullable=False)
+    authornames = Column(String(255), nullable=False)
+    frameworkslist = Column(String(255), nullable=False)
+    platformslist = Column(String(255), nullable=False)
 
 
 class LibsKeywords(Base):
@@ -137,3 +159,31 @@ class LibsKeywords(Base):
                     primary_key=True)
     keyword_id = Column(INTEGER(unsigned=True), ForeignKey("keywords.id"),
                         primary_key=True)
+
+
+class LibsPlatforms(Base):
+    __tablename__ = "libs_platforms"
+
+    lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
+                    primary_key=True)
+    platform_id = Column(INTEGER(unsigned=True), ForeignKey("platforms.id"),
+                         primary_key=True)
+
+
+class LibVersions(Base):
+    __tablename__ = "lib_versions"
+    __table_args__ = (UniqueConstraint("lib_id", "name"),)
+
+    id = Column(INTEGER(unsigned=True), primary_key=True)
+    lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
+                    nullable=False)
+    name = Column(String(20))
+    released = Column(DateTime, nullable=False, default=datetime.utcnow())
+
+
+class Platforms(Base):
+    __tablename__ = "platforms"
+
+    id = Column(INTEGER(unsigned=True), primary_key=True)
+    name = Column(String(20), unique=True, nullable=False)
+    title = Column(String(20), nullable=False)

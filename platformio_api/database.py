@@ -33,7 +33,8 @@ def sync_db():
         LibFTS.__table__,
         "after_create",
         DDL("ALTER TABLE %s ADD FULLTEXT(name, description, keywords, "
-            "examplefiles)" % LibFTS.__tablename__)
+            "examplefiles, authornames, frameworkslist, platformslist)"
+            % LibFTS.__tablename__)
     )
 
     Base.metadata.create_all(bind=engine)

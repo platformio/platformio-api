@@ -66,34 +66,36 @@ def extract_archive(archive_path, destination_dir):
         raise NotImplementedError()
 
 
-def get_libarch_relpath(id_, name, version):
-    id_ = int(id_)
-    assert id_ > 0
-    return join("libraries", "archives", str(int(ceil(id_/100))),
-                "%s_%s.tar.gz" % (name, version))
+def get_libarch_relpath(lib_id, version_id):
+    lib_id = int(lib_id)
+    version_id = int(version_id)
+    assert lib_id > 0 and version_id > 0
+    return join("libraries", "archives", str(int(ceil(lib_id/100))),
+                "%d.tar.gz" % version_id)
 
 
-def get_libarch_path(id_, name, version):
-    return join(config['DL_PIO_DIR'], get_libarch_relpath(id_, name, version))
+def get_libarch_path(lib_id, version_id):
+    return join(config['DL_PIO_DIR'], get_libarch_relpath(lib_id, version_id))
 
 
-def get_libarch_url(id_, name, version):
-    return "%s/%s" % (config['DL_PIO_URL'], get_libarch_relpath(id_, name,
-                                                                version))
+def get_libarch_url(lib_id, version_id):
+    return "%s/%s" % (config['DL_PIO_URL'],
+                      get_libarch_relpath(lib_id, version_id))
 
 
-def get_libexample_relpath(id_):
-    id_ = int(id_)
-    assert id_ > 0
-    return join("libraries", "examples", str(int(ceil(id_/100))), str(id_))
+def get_libexample_relpath(lib_id):
+    lib_id = int(lib_id)
+    assert lib_id > 0
+    return join("libraries", "examples",
+                str(int(ceil(lib_id/100))), str(lib_id))
 
 
-def get_libexample_dir(id_):
-    return join(config['DL_PIO_DIR'], get_libexample_relpath(id_))
+def get_libexample_dir(lib_id):
+    return join(config['DL_PIO_DIR'], get_libexample_relpath(lib_id))
 
 
-def get_libexample_url(id_, name):
-    return "%s/%s/%s" % (config['DL_PIO_URL'], get_libexample_relpath(id_),
+def get_libexample_url(lib_id, name):
+    return "%s/%s/%s" % (config['DL_PIO_URL'], get_libexample_relpath(lib_id),
                          name)
 
 
@@ -103,6 +105,11 @@ def validate_libconf(data):
         raise InvalidLibConf(
             "The 'name, keywords and description' fields are required")
 
+    if ("dependencies" in data and not
+            (isinstance(data['dependencies'], list) or
+             isinstance(data['dependencies'], dict))):
+        raise InvalidLibConf("The 'dependencies' field is invalid")
+
     # if github-based project
     if "repository" in data:
         repo = data['repository']
@@ -111,8 +118,14 @@ def validate_libconf(data):
             return data
 
     # if CVS-based
-    if "author" not in data or "name" not in data['author']:
-        raise InvalidLibConf("The 'author' field is required")
+    authors = data.get("authors", None)
+    if authors and not isinstance(authors, list):
+        authors = [authors]
+
+    if not authors:
+        raise InvalidLibConf("The 'authors' field is required")
+    elif not all(["name" in item for item in authors]):
+        raise InvalidLibConf("An each author should have 'name' property")
     elif ("repository" in data and
           data['repository'].get("type", None) in ("git", "svn")):
         return data
