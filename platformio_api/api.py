@@ -173,30 +173,29 @@ class LibSearchAPI(APIBase):
         query = query.join(models.Libs, models.LibDLStats)
 
         # Relationship Way
-        _authors = self.search_query['params']['authors']
-        if _authors:
+        _params = self.search_query['params']
+        if _params['authors']:
             query = query.join(models.LibsAuthors).join(
                 models.Authors,
-                and_(models.Authors.name.in_(_authors),
+                and_(models.Authors.name.in_(_params['authors']),
                      models.Authors.id == models.LibsAuthors.author_id)
             )
-        #
-        # if _params['keywords']:
-        #     query = query.join(models.LibsKeywords).join(
-        #         models.Keywords,
-        #         and_(models.Keywords.name.in_(_params['keywords']),
-        #              models.Keywords.id == models.LibsKeywords.keyword_id)
-        #     )
-        #
-        if not count and _authors:
+
+        if _params['keywords']:
+            query = query.join(models.LibsKeywords).join(
+                models.Keywords,
+                and_(models.Keywords.name.in_(_params['keywords']),
+                     models.Keywords.id == models.LibsKeywords.keyword_id)
+            )
+
+        if not count and (_params['authors'] or _params['keywords']):
             query = query.group_by(models.LibFTS.lib_id)
 
         # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
-
-        if self.search_query['params']:
-            for key, items in self.search_query['params'].iteritems():
-                if not items or key == "authors":
+        if _params:
+            for key, items in _params.iteritems():
+                if not items or key in ("authors", "keywords"):
                     continue
                 _words.append('+("%s")' % '" "'.join(items))
 
@@ -264,12 +263,27 @@ class LibExamplesAPI(LibSearchAPI):
 
         query = query.join(models.Libs, models.LibFTS)
 
-        # Cached FTS Way (the relationship way described above in the Search)
-        _words = self.make_fts_words_strict(self.search_query['words'])
+        # Relationship Way
+        _params = self.search_query['params']
+        if _params['authors']:
+            query = query.join(models.LibsAuthors).join(
+                models.Authors,
+                and_(models.Authors.name.in_(_params['authors']),
+                     models.Authors.id == models.LibsAuthors.author_id)
+            )
 
-        if self.search_query['params']:
-            for items in self.search_query['params'].values():
-                if not items:
+        if _params['keywords']:
+            query = query.join(models.LibsKeywords).join(
+                models.Keywords,
+                and_(models.Keywords.name.in_(_params['keywords']),
+                     models.Keywords.id == models.LibsKeywords.keyword_id)
+            )
+
+        # Cached FTS Way
+        _words = self.make_fts_words_strict(self.search_query['words'])
+        if _params:
+            for key, items in _params.iteritems():
+                if not items or key in ("authors", "keywords"):
                     continue
                 _words.append('+("%s")' % '" "'.join(items))
 
