@@ -441,8 +441,11 @@ class LibVersionAPI(APIBase):
     def get_result(self):
         result = dict()
         query = db_session.query(
-            models.LibVersions.lib_id, models.LibVersions.name
-        ).filter(models.LibVersions.lib_id.in_(self.ids))
+            models.Libs.id, models.LibVersions.name
+        ).join(
+            models.LibVersions,
+            models.LibVersions.id == models.Libs.latest_version_id
+        ).filter(models.Libs.id.in_(self.ids))
         result = {i[0]: i[1] for i in query.all()}
         for id_ in self.ids:
             if id_ not in result:
