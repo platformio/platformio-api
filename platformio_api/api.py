@@ -349,9 +349,9 @@ class LibInfoAPI(APIBase):
 
         # authors
         for item in data[0].authors:
-            _author = {}
-            for k in ("name", "email", "url", "maintainer"):
-                _author[k] = getattr(item, k)
+            _author = {"maintainer": item.maintainer}
+            for k in ("name", "email", "url"):
+                _author[k] = getattr(item.author, k)
             result['authors'].append(_author)
 
         # frameworks & platforms

@@ -35,7 +35,6 @@ class Authors(Base):
     name = Column(String(30), nullable=False, unique=True)
     email = Column(String(50))
     url = Column(String(100))
-    maintainer = Column(Boolean, nullable=False, default=False)
 
 
 class Frameworks(Base):
@@ -68,7 +67,7 @@ class Libs(Base):
     # relationships
     attributes = relationship("Attributes", secondary="libs_attributes",
                               cascade="all")
-    authors = relationship("Authors", secondary="libs_authors", cascade="all")
+    authors = relationship("LibsAuthors", cascade="all,delete-orphan")
     examples = relationship("LibExamples", cascade="all,delete-orphan")
     frameworks = relationship("Frameworks", secondary="libs_frameworks",
                               cascade="all")
@@ -99,6 +98,8 @@ class LibsAuthors(Base):
                     primary_key=True)
     author_id = Column(INTEGER(unsigned=True), ForeignKey("authors.id"),
                        primary_key=True)
+    maintainer = Column(Boolean, nullable=False, default=False)
+    author = relationship("Authors")
 
 
 class LibsFrameworks(Base):

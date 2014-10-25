@@ -160,14 +160,26 @@ class LibSyncer(object):
         query = db_session.query(models.Authors).filter(
             models.Authors.name.in_(authornames))
         existing = set()
-        for item in query.all():
-            existing.add(item.name)
-            self.lib.authors.append(item)
+        for _author in query.all():
+            for item in authors:
+                if item['name'] != _author.name:
+                    continue
+                existing.add(_author.name)
+                _la = models.LibsAuthors(maintainer=item['maintainer'])
+                _la.author = _author
+                self.lib.authors.append(_la)
 
         for name in (set(authornames) - existing):
             for item in authors:
-                if item['name'] == name:
-                    self.lib.authors.append(models.Authors(**item))
+                if item['name'] != name:
+                    continue
+                _la = models.LibsAuthors(maintainer=item['maintainer'])
+                _la.author = models.Authors(
+                    name=item['name'],
+                    email=item['email'],
+                    url=item['url']
+                )
+                self.lib.authors.append(_la)
 
         # save in string format for FTS
         self.lib.fts.authornames = ",".join(authornames)
