@@ -510,7 +510,8 @@ class LibStatsAPI(APIBase):
         result = dict(
             updated=self._get_last_updated(),
             added=self._get_last_added(),
-            keywords=self._get_last_keywords(),
+            lastkeywords=self._get_last_keywords(),
+            topkeywords=self._get_top_keywords(),
             dlday=self._get_most_downloaded(models.LibDLStats.day),
             dlweek=self._get_most_downloaded(models.LibDLStats.week),
             dlmonth=self._get_most_downloaded(models.LibDLStats.month)
@@ -548,6 +549,17 @@ class LibStatsAPI(APIBase):
         query = db_session.query(
             models.Keywords.name
         ).order_by(models.Keywords.id.desc()).limit(limit)
+        for item in query.all():
+            items.append(item[0])
+        return items
+
+    def _get_top_keywords(self, limit=50):
+        items = []
+        query = db_session.query(
+            models.Keywords.name, func.count(models.Keywords.id).label("total")
+        ).join(models.LibsKeywords).group_by(
+            models.Keywords.id
+        ).order_by("total DESC").limit(limit)
         for item in query.all():
             items.append(item[0])
         return items
