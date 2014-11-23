@@ -16,7 +16,7 @@ class PendingLibs(Base):
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
     conf_url = Column(String(255), nullable=False, unique=True)
-    added = Column(DateTime, nullable=False, default=datetime.utcnow())
+    added = Column(DateTime, nullable=False, default=datetime.utcnow)
     approved = Column(Boolean, nullable=False, default=False)
     processed = Column(Boolean, nullable=False, default=False)
 
@@ -60,9 +60,9 @@ class Libs(Base):
     conf_url = Column(String(200), nullable=False)
     conf_sha1 = Column(String(40))
     example_nums = Column(SMALLINT(unsigned=True))
-    updated = Column(DateTime, nullable=False, default=datetime.utcnow(),
+    updated = Column(DateTime, nullable=False, default=datetime.utcnow,
                      index=True)
-    synced = Column(DateTime, nullable=False, default=datetime.utcnow())
+    synced = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # relationships
     attributes = relationship("Attributes", secondary="libs_attributes",
@@ -117,7 +117,7 @@ class LibDLLog(Base):
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
                     primary_key=True)
     ip = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=False)
-    date = Column(DateTime, nullable=False, default=datetime.utcnow())
+    date = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class LibDLStats(Base):
@@ -179,7 +179,7 @@ class LibVersions(Base):
     lib_id = Column(INTEGER(unsigned=True), ForeignKey("libs.id"),
                     nullable=False)
     name = Column(String(20))
-    released = Column(DateTime, nullable=False, default=datetime.utcnow())
+    released = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class Platforms(Base):
