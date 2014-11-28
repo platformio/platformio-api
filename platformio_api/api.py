@@ -92,6 +92,9 @@ class LibSearchAPI(APIBase):
         }
         state = {key: None for key in params.keys()}
 
+        if query == "*":
+            query = ""
+
         for token in query.split(" "):
             token_used = False
             token = token.strip()
@@ -140,7 +143,7 @@ class LibSearchAPI(APIBase):
             if "(" in word:
                 stop = True
 
-            if word[0] not in "+-<>()~*":
+            if word[0] not in "+-<>()~" and word[-1] != "*":
                 if "-" in word:
                     word = '"%s"' % word
                 if not stop:
