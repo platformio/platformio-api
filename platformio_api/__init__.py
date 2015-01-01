@@ -18,7 +18,7 @@ __author__ = "Ivan Kravets"
 __email__ = "me@ikravets.com"
 
 __license__ = "MIT License"
-__copyright__ = "Copyright (C) 2014 Ivan Kravets"
+__copyright__ = "Copyright (C) 2014-2015 Ivan Kravets"
 
 config = dict(
     SQLALCHEMY_DATABASE_URI=None,
