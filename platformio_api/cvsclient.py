@@ -2,7 +2,7 @@
 # See LICENSE for details.
 
 from os import listdir, remove
-from os.path import isdir, isfile, join
+from os.path import dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from sys import modules
 from tempfile import mkdtemp, mkstemp
@@ -57,7 +57,22 @@ class GithubClient(BaseClient):
         self._repoapi = None
 
     def get_last_commit(self, path=None):
-        commit = self._repoapi_instance().get_commits(path=path, per_page=1)[0]
+        commit = None
+        folder_depth = 20
+        while folder_depth:
+            print path
+            folder_depth -= 1
+            commits = list(self._repoapi_instance().get_commits(
+                path=path, per_page=1))
+
+            if commits:
+                commit = commits[1]
+
+            if commit or not path or path == "/":
+                break
+            path = dirname(path)
+
+        assert commit is not None
         return dict(
             sha=commit.sha,
             date=commit.commit.author.date
