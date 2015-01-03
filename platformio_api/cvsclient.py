@@ -60,7 +60,6 @@ class GithubClient(BaseClient):
         commit = None
         folder_depth = 20
         while folder_depth:
-            print path
             folder_depth -= 1
             commits = list(self._repoapi_instance().get_commits(
                 path=path, per_page=1))
