@@ -1,19 +1,20 @@
 # Copyright (C) Ivan Kravets <me@ikravets.com>
 # See LICENSE for details.
 
+import json
 import logging
 import re
 from datetime import datetime
+from os.path import join, basename
 
-from requests import get
+import requests
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
-from platformio_api import models
+from platformio_api import __version__, models, util
 from platformio_api.database import db_session, Match
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
-from platformio_api.util import (get_libarch_url, get_libexample_url, ip2int,
-                                 validate_libconf)
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,32 @@ class APIBase(object):
 
     def get_result(self):
         raise NotImplementedError()
+
+
+class PackagesAPI(APIBase):
+
+    def get_result(self):
+        result = None
+        r = None
+
+        try:
+            headers = {"User-Agent": "PlatformIO/%s %s" % (
+                __version__, requests.utils.default_user_agent())}
+            r = requests.get(
+                "http://sourceforge.net/projects/platformio-storage/files/"
+                "packages/manifest.json", headers=headers)
+            result = r.json()
+            r.raise_for_status()
+        except:
+            with open(join(util.get_packages_dir(), "manifest.json")) as f:
+                result = json.load(f)
+            for name, versions in result.iteritems():
+                for item in versions:
+                    item['url'] = util.get_package_url(basename(item['url']))
+        finally:
+            if r:
+                r.close()
+        return result
 
 
 class LibSearchAPI(APIBase):
@@ -233,7 +260,7 @@ class LibExamplesAPI(LibSearchAPI):
             items.append(dict(
                 id=example.id,
                 name=example.name,
-                url=get_libexample_url(lib_id, example.name),
+                url=util.get_libexample_url(lib_id, example.name),
                 lib=dict(
                     id=lib_id,
                     name=lib_name,
@@ -342,7 +369,8 @@ class LibInfoAPI(APIBase):
         # examples
         for name in data[1].examplefiles.split(","):
             if name:
-                result['examples'].append(get_libexample_url(lib_id, name))
+                result['examples'].append(
+                    util.get_libexample_url(lib_id, name))
 
         # latest version
         result['version'] = dict(
@@ -407,7 +435,7 @@ class LibDownloadAPI(APIBase):
         self._logdlinfo(lib_id)
 
         result = dict(
-            url=get_libarch_url(lib_id, version_id),
+            url=util.get_libarch_url(lib_id, version_id),
             version=version_name
         )
         return result
@@ -416,7 +444,7 @@ class LibDownloadAPI(APIBase):
         if not self.ip:
             return
 
-        ip_int = ip2int(self.ip)
+        ip_int = util.ip2int(self.ip)
         try:
             query = db_session.query(models.LibDLLog).filter(
                 models.LibDLLog.lib_id == lib_id, models.LibDLLog.ip == ip_int)
@@ -478,7 +506,7 @@ class LibRegisterAPI(APIBase):
                 raise InvalidLibConf(self.conf_url)
 
             # validate fields
-            config = validate_libconf(config)
+            config = util.validate_libconf(config)
 
             # check for name duplicates
             # query = db_session.query(func.count(1)).filter(

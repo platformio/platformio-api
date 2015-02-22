@@ -69,6 +69,11 @@ def cors(request):
     return None
 
 
+@app.route("/packages")
+def packages():
+    return finalize_json_response(api.PackagesAPI, {})
+
+
 @app.route("/lib/search")
 def lib_search():
     args = dict(
