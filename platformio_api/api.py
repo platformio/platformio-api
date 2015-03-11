@@ -160,7 +160,7 @@ class LibSearchAPI(APIBase):
         if all([v is None for v in state.values()]):
             return {"params": params, "words": words}
         else:
-            return {"params": None,
+            return {"params": {},
                     "words": [i.strip() for i in query.split(" ") if len(i)]}
 
     def make_fts_words_strict(self, words):
