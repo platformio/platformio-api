@@ -5,14 +5,14 @@ import json
 import logging
 import re
 from datetime import datetime
-from os.path import join, basename
+from os.path import basename, join
 
 import requests
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import __version__, models, util
-from platformio_api.database import db_session, Match
+from platformio_api.database import Match, db_session
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
 
 
@@ -204,30 +204,29 @@ class LibSearchAPI(APIBase):
 
         # Relationship Way
         _params = self.search_query['params']
-        if _params['authors']:
+        if _params.get("authors"):
             query = query.join(models.LibsAuthors).join(
                 models.Authors,
                 and_(models.Authors.name.in_(_params['authors']),
                      models.Authors.id == models.LibsAuthors.author_id)
             )
 
-        if _params['keywords']:
+        if _params.get("keywords"):
             query = query.join(models.LibsKeywords).join(
                 models.Keywords,
                 and_(models.Keywords.name.in_(_params['keywords']),
                      models.Keywords.id == models.LibsKeywords.keyword_id)
             )
 
-        if not count and (_params['authors'] or _params['keywords']):
+        if not count and (_params.get("authors") or _params.get("keywords")):
             query = query.group_by(models.LibFTS.lib_id)
 
         # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
-        if _params:
-            for key, items in _params.iteritems():
-                if not items or key in ("authors", "keywords"):
-                    continue
-                _words.append('+("%s")' % '" "'.join(items))
+        for key, items in (_params or {}).iteritems():
+            if not items or key in ("authors", "keywords"):
+                continue
+            _words.append('+("%s")' % '" "'.join(items))
 
         if _words:
             fts_query = self.escape_fts_query(" ".join(_words))
@@ -295,14 +294,14 @@ class LibExamplesAPI(LibSearchAPI):
 
         # Relationship Way
         _params = self.search_query['params']
-        if _params['authors']:
+        if _params.get("authors"):
             query = query.join(models.LibsAuthors).join(
                 models.Authors,
                 and_(models.Authors.name.in_(_params['authors']),
                      models.Authors.id == models.LibsAuthors.author_id)
             )
 
-        if _params['keywords']:
+        if _params.get("keywords"):
             query = query.join(models.LibsKeywords).join(
                 models.Keywords,
                 and_(models.Keywords.name.in_(_params['keywords']),
@@ -311,11 +310,10 @@ class LibExamplesAPI(LibSearchAPI):
 
         # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
-        if _params:
-            for key, items in _params.iteritems():
-                if not items or key in ("authors", "keywords"):
-                    continue
-                _words.append('+("%s")' % '" "'.join(items))
+        for key, items in (_params or {}).iteritems():
+            if not items or key in ("authors", "keywords"):
+                continue
+            _words.append('+("%s")' % '" "'.join(items))
 
         if _words:
             fts_query = self.escape_fts_query(" ".join(_words))
@@ -499,7 +497,7 @@ class LibRegisterAPI(APIBase):
 
         config = dict()
         try:
-            r = get(self.conf_url)
+            r = requests.get(self.conf_url)
             try:
                 config = r.json()
             except ValueError:
