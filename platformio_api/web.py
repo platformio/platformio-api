@@ -71,7 +71,15 @@ def cors(request):
 
 @app.route("/packages")
 def packages():
-    return finalize_json_response(api.PackagesAPI, {})
+    if "PlatformIO/" in request.headers.get("User-Agent"):
+        return finalize_json_response(api.PackagesManifestAPI, {})
+    else:
+        return finalize_json_response(api.PackagesAPI, {})
+
+
+@app.route("/packages/manifest")
+def packages_manifest():
+    return finalize_json_response(api.PackagesManifestAPI, {})
 
 
 @app.route("/lib/search")

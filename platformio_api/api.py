@@ -8,6 +8,7 @@ from datetime import datetime
 from os.path import basename, join
 
 import requests
+from platformio.platforms.base import PLATFORM_PACKAGES
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -26,6 +27,13 @@ class APIBase(object):
 
 
 class PackagesAPI(APIBase):
+
+    def get_result(self):
+
+        return PLATFORM_PACKAGES
+
+
+class PackagesManifestAPI(APIBase):
 
     def get_result(self):
         result = None
