@@ -69,6 +69,16 @@ def cors(request):
     return None
 
 
+@app.route("/boards")
+def boards():
+    return finalize_json_response(api.BoardsAPI, {})
+
+
+@app.route("/frameworks")
+def frameworks():
+    return finalize_json_response(api.FrameworksAPI, {})
+
+
 @app.route("/packages")
 def packages():
     if "PlatformIO/" in request.headers.get("User-Agent"):
@@ -80,6 +90,11 @@ def packages():
 @app.route("/packages/manifest")
 def packages_manifest():
     return finalize_json_response(api.PackagesManifestAPI, {})
+
+
+@app.route("/platforms")
+def platforms():
+    return finalize_json_response(api.PlatformsAPI, {})
 
 
 @app.route("/lib/search")

@@ -8,7 +8,8 @@ from datetime import datetime
 from os.path import basename, join
 
 import requests
-from platformio.platforms.base import PLATFORM_PACKAGES
+from platformio.platforms.base import PlatformFactory, get_packages
+from platformio.util import get_boards, get_frameworks
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -26,11 +27,52 @@ class APIBase(object):
         raise NotImplementedError()
 
 
+class BoardsAPI(APIBase):
+
+    def get_result(self):
+        items = []
+        for type_, data in get_boards().iteritems():
+            items.append({
+                "type": type_,
+                "name": data['name'],
+                "mcu": data.get("build", {}).get("mcu", "").upper(),
+                "fcpu": int(data.get("build", {}).get("f_cpu", "")[:-1]),
+                "ram": data.get("upload", {}).get("maximum_ram_size", 0),
+                "rom": data.get("upload", {}).get("maximum_size", 0),
+                "frameworks": data['frameworks'],
+                "platform": data['platform'],
+                "vendor": data['vendor'],
+                "url": data['url']
+            })
+        return items
+
+
+class FrameworksAPI(APIBase):
+
+    def get_result(self):
+        items = []
+        for type_, data in get_frameworks().iteritems():
+            items.append({
+                'type': type_,
+                'name': data['name'],
+                'description': data['description'],
+                'url': data['url']
+            })
+        return items
+
+
 class PackagesAPI(APIBase):
 
     def get_result(self):
-
-        return PLATFORM_PACKAGES
+        result = {}
+        for name, contents in get_packages().iteritems():
+            result[name] = []
+            for c in contents:
+                result[name].append({
+                    'name': c[0],
+                    'url': c[1]
+                })
+        return result
 
 
 class PackagesManifestAPI(APIBase):
@@ -57,6 +99,22 @@ class PackagesManifestAPI(APIBase):
             if r:
                 r.close()
         return result
+
+
+class PlatformsAPI(APIBase):
+
+    def get_result(self):
+        result = []
+        for type_ in PlatformFactory.get_platforms().keys():
+            p = PlatformFactory.newPlatform(type_)
+            result.append({
+                'type': type_,
+                'name': p.get_name(),
+                'description': p.get_description(),
+                'url': p.get_vendor_url(),
+                'packages': p.get_packages().keys()
+            })
+        return sorted(result, key=lambda item: item['type'])
 
 
 class LibSearchAPI(APIBase):
