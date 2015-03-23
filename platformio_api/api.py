@@ -423,6 +423,8 @@ class LibInfoAPI(APIBase):
         lib_id = data[0].id
 
         result['id'] = lib_id
+        result['confurl'] = data[0].conf_url
+
         for k in ("name", "description"):
             result[k] = getattr(data[1], k)
         result['keywords'] = data[1].keywords.split(",")
