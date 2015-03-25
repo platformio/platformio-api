@@ -3,6 +3,7 @@
 
 from sys import exit as sys_exit
 
+import requests
 from click import echo, group, version_option
 
 from platformio_api import __version__
@@ -45,6 +46,10 @@ def runserver():
 
 
 def main():
+    # https://urllib3.readthedocs.org
+    # /en/latest/security.html#insecureplatformwarning
+    requests.packages.urllib3.disable_warnings()
+
     cli()
 
 
