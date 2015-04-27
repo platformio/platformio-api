@@ -9,8 +9,8 @@ from os.path import dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from sys import modules
 from tempfile import mkdtemp, mkstemp
-from urllib2 import urlopen
 
+import requests
 from PyGithub import BlockingBuilder
 
 from platformio_api import config
@@ -148,10 +148,10 @@ class MbedClient(BaseClient):
             return self._last_commit
         history_url = self.url + "shortlog"
         logger.debug("Fetching commit metadata on URL: %s" % history_url)
-        page = urlopen(history_url)
-        assert 200 == page.code, \
-            "HTTP status code is not OK. Returned code: %s" % page.code
-        html = page.read()
+        r = requests.get(history_url)
+        assert 200 == r.status_code, \
+            "HTTP status code is not OK. Returned code: %s" % r.status_code
+        html = r.text
         sha = re.search("\d+:(?P<sha>[a-f0-9]{12})", html)
         date_string = re.search("\d{2} [a-zA-Z]{3} [0-9]{4}", html).group()
         date = datetime.strptime(date_string, "%d %b %Y").date()
