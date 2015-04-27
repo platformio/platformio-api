@@ -43,7 +43,7 @@ class LibSyncer(object):
         self.cvsclient = None
         if "repository" in self.config:
             _type = self.config['repository'].get("type", "").lower()
-            _url = self.config['repository'].get("url", "").lower()
+            _url = self.config['repository'].get("url", "")
             if _type and _url:
                 self.cvsclient = CVSClientFactory.newClient(_type, _url)
 
