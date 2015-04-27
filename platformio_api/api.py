@@ -409,43 +409,42 @@ class LibInfoAPI(APIBase):
             frameworks={},
             platforms={}
         )
+
         query = db_session.query(
-            models.Libs, models.LibFTS, models.LibDLStats, models.LibVersions
-        ).join(models.LibFTS, models.LibDLStats).join(
+            models.Libs, models.LibVersions
+        ).join(
             models.LibVersions,
             models.LibVersions.id == models.Libs.latest_version_id
         ).filter(models.Libs.id == self.id_)
         try:
-            data = query.one()
+            lib, libversion = query.one()
         except NoResultFound:
             raise APINotFound("Unknown library with ID '%s'" % str(self.id_))
 
-        lib_id = data[0].id
-
-        result['id'] = lib_id
-        result['confurl'] = data[0].conf_url
+        result['id'] = lib.id
+        result['confurl'] = lib.conf_url
 
         for k in ("name", "description"):
-            result[k] = getattr(data[1], k)
-        result['keywords'] = data[1].keywords.split(",")
+            result[k] = getattr(lib.fts, k)
+        result['keywords'] = lib.fts.keywords.split(",")
 
         for k in ("day", "week", "month"):
-            result['dlstats'][k] = getattr(data[2], k)
+            result['dlstats'][k] = getattr(lib.dlstats, k)
 
         # examples
-        for name in data[1].examplefiles.split(","):
+        for name in lib.fts.examplefiles.split(","):
             if name:
                 result['examples'].append(
-                    util.get_libexample_url(lib_id, name))
+                    util.get_libexample_url(lib.id, name))
 
         # latest version
         result['version'] = dict(
-            name=data[3].name,
-            released=data[3].released.strftime("%Y-%m-%dT%H:%M:%SZ")
+            name=libversion.name,
+            released=libversion.released.strftime("%Y-%m-%dT%H:%M:%SZ")
         )
 
         # authors
-        for item in data[0].authors:
+        for item in lib.authors:
             _author = {"maintainer": item.maintainer}
             for k in ("name", "email", "url"):
                 _author[k] = getattr(item.author, k)
@@ -454,10 +453,11 @@ class LibInfoAPI(APIBase):
         # frameworks & platforms
         for what in ("frameworks", "platforms"):
             result[what] = []
-            _list = getattr(data[1], what + "list").split(",")
+            _list = getattr(lib.fts, what + "list").split(",")
             for l in _list:
                 if ":" in l:
                     result[what].append(l.split(":")[0])
+
 
         return result
 

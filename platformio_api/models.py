@@ -70,9 +70,11 @@ class Libs(Base):
     examples = relationship("LibExamples", cascade="all,delete-orphan")
     frameworks = relationship("Frameworks", secondary="libs_frameworks",
                               cascade="all")
-    fts = relationship("LibFTS", uselist=False, lazy="joined", cascade="all")
+    fts = relationship("LibFTS", uselist=False, lazy="joined", innerjoin=True,
+                       cascade="all")
     dllog = relationship("LibDLLog", cascade="all")
-    dlstats = relationship("LibDLStats", uselist=False, cascade="all")
+    dlstats = relationship("LibDLStats", uselist=False, lazy="joined",
+                           innerjoin=True, cascade="all")
     keywords = relationship("Keywords", secondary="libs_keywords",
                             cascade="all")
     platforms = relationship("Platforms", secondary="libs_platforms",
@@ -88,7 +90,7 @@ class LibsAttributes(Base):
     attribute_id = Column(INTEGER(unsigned=True), ForeignKey("attributes.id"),
                           primary_key=True)
     value = Column(String(255), nullable=False)
-    attribute = relationship("Attributes")
+    attribute = relationship("Attributes", lazy="joined", innerjoin=True)
 
 
 class LibsAuthors(Base):
@@ -99,7 +101,7 @@ class LibsAuthors(Base):
     author_id = Column(INTEGER(unsigned=True), ForeignKey("authors.id"),
                        primary_key=True)
     maintainer = Column(Boolean, nullable=False, default=False)
-    author = relationship("Authors")
+    author = relationship("Authors", lazy="joined")
 
 
 class LibsFrameworks(Base):
