@@ -458,6 +458,15 @@ class LibInfoAPI(APIBase):
                 if ":" in l:
                     result[what].append(l.split(":")[0])
 
+        # attributes
+        attributes = {}
+        for item in lib.attributes:
+            attributes[item.attribute.name] = item.value
+
+        # home url
+        if set(["url", "repository.url"]) & set(attributes.keys()):
+            result['url'] = attributes.get(
+                "url", attributes.get("repository.url"))
 
         return result
 
