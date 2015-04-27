@@ -93,8 +93,8 @@ class LibSyncer(object):
         self.lib.conf_sha1 = config_sha1
         self.lib.updated = datetime.utcnow()
 
-        # update versions data
         self.lib.latest_version_id = self.sync_version(version)
+        self.lib.attributes = self.sync_attributes()
 
         # FTS defaults
         if self.lib.fts is None:
@@ -102,7 +102,6 @@ class LibSyncer(object):
         self.lib.fts.name = self.config['name']
         self.lib.fts.description = self.config.get("description", None)
 
-        # update authors data wit new from conf or CVS
         self.config['authors'] = self.sync_authors(
             self.config.get("authors", None))
         self.config['keywords'] = self.sync_keywords(
@@ -236,6 +235,32 @@ class LibSyncer(object):
         ]))
 
         return items
+
+    def sync_attributes(self):
+        confattrs = {}
+        self._fetch_conf_attrs(confattrs, self.config)
+
+        attributes = []
+        for attribute in db_session.query(models.Attributes).all():
+            if attribute.name not in confattrs:
+                continue
+            _la = models.LibsAttributes(value=confattrs[attribute.name])
+            _la.attribute = attribute
+            attributes.append(_la)
+
+        return attributes
+
+    def _fetch_conf_attrs(self, confattrs, node, path=None):
+        if path is None:
+            path = []
+
+        for k, v in node.iteritems():
+            if isinstance(v, dict):
+                self._fetch_conf_attrs(confattrs, v, path + [k])
+                continue
+            elif isinstance(v, list):
+                v = json.dumps(v)
+            confattrs[".".join(path + [k])] = v
 
     def archive(self):
         archdir = mkdtemp()

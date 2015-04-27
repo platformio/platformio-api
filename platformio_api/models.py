@@ -65,8 +65,7 @@ class Libs(Base):
     synced = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # relationships
-    attributes = relationship("Attributes", secondary="libs_attributes",
-                              cascade="all")
+    attributes = relationship("LibsAttributes", cascade="all,delete-orphan")
     authors = relationship("LibsAuthors", cascade="all,delete-orphan")
     examples = relationship("LibExamples", cascade="all,delete-orphan")
     frameworks = relationship("Frameworks", secondary="libs_frameworks",
@@ -88,7 +87,8 @@ class LibsAttributes(Base):
                     primary_key=True)
     attribute_id = Column(INTEGER(unsigned=True), ForeignKey("attributes.id"),
                           primary_key=True)
-    value = Column(String(100), nullable=False)
+    value = Column(String(255), nullable=False)
+    attribute = relationship("Attributes")
 
 
 class LibsAuthors(Base):
