@@ -69,16 +69,19 @@ class Libs(Base):
     authors = relationship("LibsAuthors", cascade="all,delete-orphan")
     examples = relationship("LibExamples", cascade="all,delete-orphan")
     frameworks = relationship("Frameworks", secondary="libs_frameworks",
-                              cascade="all")
+                              cascade="save-update, merge, refresh-expire, "
+                                      "expunge")
     fts = relationship("LibFTS", uselist=False, lazy="joined", innerjoin=True,
                        cascade="all")
     dllog = relationship("LibDLLog", cascade="all")
     dlstats = relationship("LibDLStats", uselist=False, lazy="joined",
                            innerjoin=True, cascade="all")
     keywords = relationship("Keywords", secondary="libs_keywords",
-                            cascade="all")
+                            cascade="save-update, merge, refresh-expire, "
+                                    "expunge")
     platforms = relationship("Platforms", secondary="libs_platforms",
-                             cascade="all")
+                             cascade="save-update, merge, refresh-expire, "
+                                     "expunge")
     versions = relationship("LibVersions", cascade="all")
 
 

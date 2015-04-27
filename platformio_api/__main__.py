@@ -4,12 +4,13 @@
 from sys import exit as sys_exit
 
 import requests
-from click import echo, group, version_option
+from click import argument, echo, group, version_option
 
 from platformio_api import __version__
 from platformio_api.crawler import (process_pending_libs, rotate_libs_dlstats,
                                     sync_libs)
 from platformio_api.database import sync_db
+from platformio_api.maintainance import delete_library
 from platformio_api.web import app
 
 
@@ -43,6 +44,12 @@ def rotatelibsdlstats():
 @cli.command("run")
 def runserver():
     app.run(debug=True, reloader=True)
+
+
+@cli.command()
+@argument('lib_id', type=int)
+def deletelib(lib_id):
+    delete_library(lib_id)
 
 
 def main():
