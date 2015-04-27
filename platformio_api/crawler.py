@@ -21,7 +21,7 @@ from platformio_api.cvsclient import CVSClientFactory
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
-from platformio_api.util import validate_libconf
+from platformio_api.util import get_c_sources, validate_libconf
 
 logger = logging.getLogger(__name__)
 
@@ -262,9 +262,28 @@ class LibSyncer(object):
                 v = json.dumps(v)
             confattrs[".".join(path + [k])] = v
 
+    def _get_mbed_examples(self, urls, temporary_dir):
+        actual_examples_dir = mkdtemp(dir=temporary_dir)
+        files = []
+        for url in urls:
+            client = CVSClientFactory.newClient("hg", url)
+            repo_name = client.url.split('/')[-2]
+            repo_dir = mkdtemp(dir=temporary_dir)
+            client.clone(repo_dir)
+            for old_file_path in get_c_sources(repo_dir):
+                if isdir(old_file_path):
+                    continue
+                new_file_path = join(
+                    actual_examples_dir,
+                    "%s_%s" % (repo_name, basename(old_file_path)))
+                copy(old_file_path, new_file_path)
+                files.append(new_file_path)
+        return files
+
     def archive(self):
         archdir = mkdtemp()
         srcdir = mkdtemp()
+        examples_dir = None
 
         try:
             if self.cvsclient:
@@ -341,14 +360,21 @@ class LibSyncer(object):
             else:
                 if not isinstance(exmglobs, list):
                     exmglobs = [exmglobs]
-                for fmask in exmglobs:
-                    exmfiles += glob(
-                        join(archdir if inclist is None else srcdir, fmask)
-                    )
+                repo_url = self.config.get('repository', {}).get("url", "")
+                if "developer.mbed.org" in repo_url:
+                    examples_dir = mkdtemp(prefix='pio_ex%s' % self.lib.id)
+                    exmfiles = self._get_mbed_examples(exmglobs, examples_dir)
+                else:
+                    for fmask in exmglobs:
+                        exmfiles += glob(
+                            join(archdir if inclist is None else srcdir, fmask)
+                        )
             self.sync_examples(exmfiles)
         finally:
             rmtree(archdir)
             rmtree(srcdir)
+            if examples_dir:
+                rmtree(examples_dir)
 
     def sync_examples(self, files):
         # clean previous examples

@@ -1,6 +1,7 @@
 # Copyright (C) Ivan Kravets <me@ikravets.com>
 # See LICENSE for details.
 
+from glob import glob
 from math import ceil
 from os.path import join
 from socket import inet_aton, inet_ntoa
@@ -118,11 +119,12 @@ def validate_libconf(data):
              isinstance(data['dependencies'], dict))):
         raise InvalidLibConf("The 'dependencies' field is invalid")
 
-    # if github-based project
+    # if github- or mbed-based project
     if "repository" in data:
-        repo = data['repository']
-        if (repo.get("type", None) == "git" and
-                "github.com" in repo.get("url", None)):
+        type = data['repository'].get("type", None)
+        url = data['repository'].get("url", "")
+        if ((type == "git" and "github.com" in url)  # github
+                or (type == "hg" and "developer.mbed.org" in url)):  # mbed
             return data
 
     # if CVS-based
@@ -145,3 +147,8 @@ def validate_libconf(data):
         raise InvalidLibConf("The 'downloadUrl' field is required")
 
     return data
+
+
+def get_c_sources(in_dir):
+    return glob(join(in_dir, '*.c')) + glob(join(in_dir, '*.cpp')) \
+        + glob(join(in_dir, '*.h'))
