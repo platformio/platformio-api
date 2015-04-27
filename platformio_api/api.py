@@ -516,7 +516,7 @@ class LibDownloadAPI(APIBase):
         return result
 
     def _logdlinfo(self, lib_id):
-        if not self.ip:
+        if not self.ip or int(lib_id) in (58, 115):
             return
 
         ip_int = util.ip2int(self.ip)
