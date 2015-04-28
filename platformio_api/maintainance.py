@@ -53,7 +53,7 @@ def cleanup_lib_versions(keep_versions):
             .join(Libs.versions)\
             .group_by(Libs)
         for lib, versions_count in libs_query.all():
-            if versions_count < keep_versions:
+            if versions_count <= keep_versions:
                 continue
             versions_query = db_session.query(LibVersions)\
                 .with_parent(lib)\
