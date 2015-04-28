@@ -10,7 +10,7 @@ from platformio_api import __version__
 from platformio_api.crawler import (process_pending_libs, rotate_libs_dlstats,
                                     sync_libs)
 from platformio_api.database import sync_db
-from platformio_api.maintainance import delete_library
+from platformio_api.maintainance import cleanup_lib_versions, delete_library
 from platformio_api.web import app
 
 
@@ -50,6 +50,12 @@ def runserver():
 @argument('lib_id', type=int)
 def deletelib(lib_id):
     delete_library(lib_id)
+
+
+@cli.command()
+@argument("keep_versions", type=int)
+def cleanuplibversions(keep_versions):
+    cleanup_lib_versions(keep_versions)
 
 
 def main():
