@@ -2,6 +2,8 @@
 # See LICENSE for details.
 
 import logging
+from datetime import datetime, timedelta
+from math import ceil
 from os import remove
 from shutil import rmtree
 
@@ -61,6 +63,21 @@ def cleanup_lib_versions(keep_versions):
             for version in versions_query.all()[keep_versions:]:
                 remove_library_version_archive(lib.id, version.id)
                 db_session.delete(version)
+        db_session.commit()
+    except Exception as e:
+        db_session.rollback()
+        logger.exception(e)
+
+
+def optimise_sync_period():
+    try:
+        libs = db_session.query(Libs)
+        libs_count = libs.count()
+        dt = timedelta(seconds=ceil(86400 / libs_count))  # 24h == 86400s
+        new_sync_datetime = datetime.utcnow()
+        for lib in libs.all():
+            lib.synced = new_sync_datetime
+            new_sync_datetime += dt
         db_session.commit()
     except Exception as e:
         db_session.rollback()
