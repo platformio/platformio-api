@@ -8,9 +8,9 @@ from socket import inet_aton, inet_ntoa
 from struct import pack, unpack
 from subprocess import check_call
 
-from requests import get
+import requests
 
-from platformio_api import config
+from platformio_api import __version__, config
 from platformio_api.exception import (DLFileError, DLFileSizeError,
                                       InvalidLibConf)
 
@@ -30,7 +30,9 @@ def download_file(source_url, destination_path):
     f = None
     r = None
     try:
-        r = get(source_url, stream=True)
+        headers = {"User-Agent": "PlatformIOLibRegistry/%s %s" % (
+            __version__, requests.utils.default_user_agent())}
+        r = requests.get(source_url, headers=headers, stream=True)
         if r.status_code != 200:
             raise DLFileError("status=%d, url=%s" % (
                 r.status_code, source_url))
