@@ -76,6 +76,12 @@ class GitClient(BaseClient):
         raise NotImplementedError()
 
 
+class HgClient(BaseClient):
+
+    def __init__(self, url):
+        raise NotImplementedError()
+
+
 class SvnClient(BaseClient):
 
     def __init__(self, url):
