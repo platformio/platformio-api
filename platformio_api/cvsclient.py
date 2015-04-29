@@ -7,6 +7,7 @@ from datetime import datetime
 from os import listdir, remove
 from os.path import dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
+from subprocess import check_call
 from sys import modules
 from tempfile import mkdtemp, mkstemp
 
@@ -164,6 +165,4 @@ class MbedClient(BaseClient):
         return self._last_commit
 
     def clone(self, destination_dir):
-        url = "%(repo_url)sarchive/%(sha)s.tar.gz" % dict(
-            repo_url=self.url, sha=self.get_last_commit()['sha'])
-        self._download_and_unpack_archive(url, destination_dir)
+        check_call(["hg", "clone", self.url, destination_dir])

@@ -1,6 +1,7 @@
 # Copyright (C) Ivan Kravets <me@ikravets.com>
 # See LICENSE for details.
 
+from contextlib import contextmanager
 from glob import glob
 from math import ceil
 from os.path import join
@@ -154,3 +155,22 @@ def validate_libconf(data):
 def get_c_sources(in_dir):
     return glob(join(in_dir, '*.c')) + glob(join(in_dir, '*.cpp')) \
         + glob(join(in_dir, '*.h'))
+
+
+@contextmanager
+def rollback_on_exception(session, logger=None):
+    try:
+        yield
+    except Exception as e:
+        session.rollback()
+        if logger is not None:
+            logger.exception(e)
+
+
+def rollback_on_exception_decorator(session, logger=None):
+    def actual_decorator(f):
+        def wrapped(*args, **kwargs):
+            with rollback_on_exception(session, logger):
+                f(*args, **kwargs)
+        return wrapped
+    return actual_decorator

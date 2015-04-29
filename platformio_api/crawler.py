@@ -21,7 +21,8 @@ from platformio_api.cvsclient import CVSClientFactory
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
-from platformio_api.util import get_c_sources, validate_libconf
+from platformio_api.util import (get_c_sources, rollback_on_exception,
+                                 validate_libconf)
 
 logger = logging.getLogger(__name__)
 
@@ -408,7 +409,7 @@ def process_pending_libs():
     for (item, lib_id) in query.all():
         if lib_id:
             continue
-        try:
+        with rollback_on_exception(db_session, logger):
             lib = models.Libs(conf_url=item.conf_url)
             lib.dlstats = models.LibDLStats(day=0, week=0, month=0)
             db_session.add(lib)
@@ -418,24 +419,18 @@ def process_pending_libs():
 
             item.processed = True
             db_session.commit()
-        except Exception as e:
-            db_session.rollback()
-            logger.exception(e)
 
 
 def sync_libs():
     query = db_session.query(models.Libs).filter(
         models.Libs.synced < datetime.utcnow() - timedelta(days=1))
     for item in query.all():
-        try:
+        with rollback_on_exception(db_session, logger):
             ls = LibSyncer(item)
             if ls.sync():
                 item.synced = datetime.utcnow()
 
             db_session.commit()
-        except Exception as e:
-            db_session.rollback()
-            logger.exception(e)
 
 
 def rotate_libs_dlstats():
