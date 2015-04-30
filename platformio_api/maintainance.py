@@ -119,7 +119,7 @@ def cleanup_lib_versions(keep_versions):
     db_session.commit()
 
 
-@util.ollback_on_exception_decorator(db_session, logger)
+@util.rollback_on_exception_decorator(db_session, logger)
 def optimise_sync_period():
     libs = db_session.query(models.Libs)
     libs_count = libs.count()
