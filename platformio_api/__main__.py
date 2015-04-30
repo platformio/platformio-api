@@ -6,7 +6,7 @@ from sys import exit as sys_exit
 import requests
 from click import argument, echo, group, version_option
 
-from platformio_api import __version__, maintainance
+from platformio_api import __version__, maintenance
 from platformio_api.database import sync_db
 from platformio_api.web import app
 
@@ -25,17 +25,17 @@ def syncdb():
 
 @cli.command()
 def pendinglibs():
-    maintainance.process_pending_libs()
+    maintenance.process_pending_libs()
 
 
 @cli.command()
 def synclibs():
-    maintainance.sync_libs()
+    maintenance.sync_libs()
 
 
 @cli.command()
 def rotatelibsdlstats():
-    maintainance.rotate_libs_dlstats()
+    maintenance.rotate_libs_dlstats()
 
 
 @cli.command("run")
@@ -46,18 +46,18 @@ def runserver():
 @cli.command()
 @argument('lib_id', type=int)
 def deletelib(lib_id):
-    maintainance.delete_library(lib_id)
+    maintenance.delete_library(lib_id)
 
 
 @cli.command()
 @argument("keep_versions", type=int)
 def cleanuplibversions(keep_versions):
-    maintainance.cleanup_lib_versions(keep_versions)
+    maintenance.cleanup_lib_versions(keep_versions)
 
 
 @cli.command()
 def optimisesyncperiod():
-    maintainance.optimise_sync_period()
+    maintenance.optimise_sync_period()
 
 
 def main():
