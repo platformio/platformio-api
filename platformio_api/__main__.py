@@ -7,8 +7,6 @@ import requests
 from click import argument, echo, group, version_option
 
 from platformio_api import __version__, maintainance
-from platformio_api.crawler import (process_pending_libs, rotate_libs_dlstats,
-                                    sync_libs)
 from platformio_api.database import sync_db
 from platformio_api.web import app
 
@@ -27,17 +25,17 @@ def syncdb():
 
 @cli.command()
 def pendinglibs():
-    process_pending_libs()
+    maintainance.process_pending_libs()
 
 
 @cli.command()
 def synclibs():
-    sync_libs()
+    maintainance.sync_libs()
 
 
 @cli.command()
 def rotatelibsdlstats():
-    rotate_libs_dlstats()
+    maintainance.rotate_libs_dlstats()
 
 
 @cli.command("run")
