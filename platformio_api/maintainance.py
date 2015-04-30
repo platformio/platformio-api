@@ -69,7 +69,7 @@ def optimise_sync_period():
     libs = db_session.query(Libs)
     libs_count = libs.count()
     dt = timedelta(seconds=ceil(86400 / libs_count))  # 24h == 86400s
-    new_sync_datetime = datetime.utcnow()
+    new_sync_datetime = datetime.utcnow() - timedelta(hours=24)
     for lib in libs.all():
         lib.synced = new_sync_datetime
         new_sync_datetime += dt

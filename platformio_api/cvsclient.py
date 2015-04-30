@@ -4,10 +4,10 @@
 import logging
 import re
 from datetime import datetime
-from os import listdir, remove
+from os import listdir, mkdir, remove
 from os.path import dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
-from subprocess import check_call
+from subprocess import CalledProcessError, check_call
 from sys import modules
 from tempfile import mkdtemp, mkstemp
 
@@ -171,4 +171,13 @@ class MbedClient(BaseClient):
         return self._last_commit
 
     def clone(self, destination_dir):
-        check_call(["hg", "clone", self.url, destination_dir])
+        try:
+            archive_url = "%(repo_url)sarchive/%(sha)s.tar.gz" % dict(
+                repo_url=self.url, sha=self.get_last_commit()['sha'])
+            self._download_and_unpack_archive(archive_url, destination_dir)
+        except CalledProcessError:
+            logger.info("Unable to extract repo archive. Cloning archive with "
+                        "hg.")
+            rmtree(destination_dir)
+            mkdir(destination_dir)
+            check_call(["hg", "clone", self.url, destination_dir])
