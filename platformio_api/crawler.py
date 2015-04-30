@@ -4,7 +4,7 @@
 import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from glob import glob
 from hashlib import sha1
 from os import listdir, makedirs, remove
@@ -13,7 +13,6 @@ from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
 
 from requests import get
-from sqlalchemy import and_, func, select
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import models, util
@@ -21,8 +20,8 @@ from platformio_api.cvsclient import CVSClientFactory
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
-from platformio_api.util import (get_c_sources, rollback_on_exception,
-                                 validate_libconf)
+from platformio_api.util import get_c_sources, validate_libconf
+
 
 logger = logging.getLogger(__name__)
 
@@ -400,52 +399,3 @@ class LibSyncer(object):
         self.lib.example_nums = len(usednames)
         usednames.sort(key=lambda v: v.upper())
         self.lib.fts.examplefiles = ",".join(usednames)
-
-
-def process_pending_libs():
-    query = db_session.query(models.PendingLibs, models.Libs.id).filter(
-        ~models.PendingLibs.processed, models.PendingLibs.approved).outerjoin(
-            models.Libs, models.PendingLibs.conf_url == models.Libs.conf_url)
-    for (item, lib_id) in query.all():
-        if lib_id:
-            continue
-        with rollback_on_exception(db_session, logger):
-            lib = models.Libs(conf_url=item.conf_url)
-            lib.dlstats = models.LibDLStats(day=0, week=0, month=0)
-            db_session.add(lib)
-
-            ls = LibSyncer(lib)
-            ls.sync()
-
-            item.processed = True
-            db_session.commit()
-
-
-def sync_libs():
-    query = db_session.query(models.Libs).filter(
-        models.Libs.synced < datetime.utcnow() - timedelta(days=1))
-    for item in query.all():
-        with rollback_on_exception(db_session, logger):
-            ls = LibSyncer(item)
-            if ls.sync():
-                item.synced = datetime.utcnow()
-
-            db_session.commit()
-
-
-def rotate_libs_dlstats():
-    # delete obsolete logs
-    db_session.query(models.LibDLLog.lib_id).filter(
-        models.LibDLLog.date < datetime.utcnow() - timedelta(days=30)).delete()
-
-    db_session.query(models.LibDLStats).update(dict(
-        day=0,
-        week=select([func.count(1)]).where(and_(
-            models.LibDLLog.lib_id == models.LibDLStats.lib_id,
-            models.LibDLLog.date > datetime.utcnow() - timedelta(days=7)
-        )).as_scalar(),
-        month=select([func.count(1)]).where(
-            models.LibDLLog.lib_id == models.LibDLStats.lib_id).as_scalar()
-    ), synchronize_session=False)
-
-    db_session.commit()
