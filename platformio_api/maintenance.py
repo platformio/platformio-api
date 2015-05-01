@@ -12,8 +12,20 @@ from sqlalchemy import and_, func, select
 from platformio_api import models, util
 from platformio_api.crawler import LibSyncer
 from platformio_api.database import db_session
+from platformio_api.util import get_origin
 
 logger = logging.getLogger(__name__)
+
+
+def _recalculate_sync_order(origin):
+    scale = 100
+    libs = db_session.query(models.Libs).filter(models.Libs.origin == origin)
+    libs_count = libs.count()
+    distance = scale / libs_count
+    order = 0
+    for lib in libs.all():
+        lib.sync_order = order
+        order += distance
 
 
 def process_pending_libs():
@@ -50,6 +62,9 @@ def sync_libs():
             ls = LibSyncer(item)
             if ls.sync():
                 item.synced = datetime.utcnow()
+            if not item.origin:
+                item.origin = get_origin(ls.cvsclient.url)
+                _recalculate_sync_order(item.origin)
 
             db_session.commit()
 
@@ -125,7 +140,7 @@ def optimise_sync_period():
     libs_count = libs.count()
     dt = timedelta(seconds=ceil(86400 / libs_count))  # 24h == 86400s
     new_sync_datetime = datetime.utcnow() - timedelta(hours=24)
-    for lib in libs.all():
+    for lib in libs.order_by(models.Libs.sync_order.asc()).all():
         lib.synced = new_sync_datetime
         new_sync_datetime += dt
     db_session.commit()

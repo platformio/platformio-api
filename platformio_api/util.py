@@ -8,6 +8,7 @@ from os.path import join
 from socket import inet_aton, inet_ntoa
 from struct import pack, unpack
 from subprocess import check_call
+from urlparse import urlparse
 
 import requests
 
@@ -174,3 +175,8 @@ def rollback_on_exception_decorator(session, logger=None):
                 f(*args, **kwargs)
         return wrapped
     return actual_decorator
+
+
+def get_origin(url):
+    domain = urlparse(url).netloc
+    return domain if domain else None
