@@ -3,8 +3,8 @@
 
 from datetime import datetime
 
-from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, String, Text,
-                        UniqueConstraint)
+from sqlalchemy import (Boolean, Column, DateTime, Float, ForeignKey, String,
+                        Text, UniqueConstraint)
 from sqlalchemy.dialects.mysql import INTEGER, SMALLINT
 from sqlalchemy.orm import relationship
 
@@ -63,6 +63,8 @@ class Libs(Base):
     updated = Column(DateTime, nullable=False, default=datetime.utcnow,
                      index=True)
     synced = Column(DateTime, nullable=False, default=datetime.utcnow)
+    origin = Column(String(30), default=None)
+    sync_order = Column(Float(), default=0)
 
     # relationships
     attributes = relationship("LibsAttributes", cascade="all,delete-orphan")
