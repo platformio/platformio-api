@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime
 from os import listdir, mkdir, remove
-from os.path import dirname, isdir, isfile, join
+from os.path import dirname, exists, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from subprocess import CalledProcessError, check_call
 from sys import modules
@@ -178,6 +178,7 @@ class MbedClient(BaseClient):
         except CalledProcessError:
             logger.info("Unable to extract repo archive. Cloning archive with "
                         "hg.")
-            rmtree(destination_dir)
+            if exists(destination_dir):
+                rmtree(destination_dir)
             mkdir(destination_dir)
             check_call(["hg", "clone", self.url, destination_dir])
