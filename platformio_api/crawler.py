@@ -8,7 +8,7 @@ from datetime import datetime
 from glob import glob
 from hashlib import sha1
 from os import listdir, makedirs, remove
-from os.path import basename, dirname, isdir, isfile, join
+from os.path import basename, dirname, exists, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
 
@@ -371,9 +371,11 @@ class LibSyncer(object):
                         )
             self.sync_examples(exmfiles)
         finally:
-            rmtree(archdir)
-            rmtree(srcdir)
-            if examples_dir:
+            if archdir and exists(archdir):
+                rmtree(archdir)
+            if srcdir and exists(srcdir):
+                rmtree(srcdir)
+            if examples_dir and exists(examples_dir):
                 rmtree(examples_dir)
 
     def sync_examples(self, files):
