@@ -63,6 +63,7 @@ class Libs(Base):
     updated = Column(DateTime, nullable=False, default=datetime.utcnow,
                      index=True)
     synced = Column(DateTime, nullable=False, default=datetime.utcnow)
+    active = Column(Boolean, nullable=False, default=True)
 
     # relationships
     attributes = relationship("LibsAttributes", cascade="all,delete-orphan")

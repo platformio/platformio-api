@@ -43,15 +43,18 @@ def process_pending_libs():
 
 
 def sync_libs():
-    query = db_session.query(models.Libs).filter(
-        models.Libs.synced < datetime.utcnow() - timedelta(days=1))
+    query = db_session.query(models.Libs)\
+        .filter(models.Libs.synced < datetime.utcnow() - timedelta(days=1),
+                models.Libs.active)
     for item in query.all():
+        sync_succeeded = False
         with util.rollback_on_exception(db_session, logger):
             ls = LibSyncer(item)
-            if ls.sync():
+            sync_succeeded = ls.sync()
+            if sync_succeeded:
                 item.synced = datetime.utcnow()
-
-            db_session.commit()
+        item.active = bool(sync_succeeded)
+        db_session.commit()
 
 
 def rotate_libs_dlstats():
