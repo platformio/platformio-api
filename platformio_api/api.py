@@ -473,10 +473,11 @@ class LibInfoAPI(APIBase):
 
 class LibDownloadAPI(APIBase):
 
-    def __init__(self, id_, ip=None, version=None):
+    def __init__(self, id_, ip=None, version=None, ci=False):
         self.id_ = id_
         self.ip = ip
         self.version = version.strip() if version else None
+        self.ci = ci
 
     def get_result(self):
         if self.version:
@@ -516,7 +517,7 @@ class LibDownloadAPI(APIBase):
         return result
 
     def _logdlinfo(self, lib_id):
-        if not self.ip or int(lib_id) in (58, 115):
+        if not self.ip or self.ci:
             return
 
         ip_int = util.ip2int(self.ip)

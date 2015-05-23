@@ -126,8 +126,9 @@ def lib_info(id_):
 def lib_download(id_):
     args = dict(
         id_=id_,
+        ip=request.remote_addr,
         version=request.query.version,
-        ip=request.remote_addr
+        ci="CI/1" in request.headers.get("User-Agent", "")
     )
     return finalize_json_response(api.LibDownloadAPI, args)
 
