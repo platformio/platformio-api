@@ -222,8 +222,13 @@ class LibSyncer(object):
         dbitems = []
         if items:
             _model = getattr(models, what.title())
-            dbitems = db_session.query(_model).filter(
-                _model.name.in_(items)).all()
+            dbitems = db_session.query(_model)
+            if items[0] == "*":
+                dbitems = dbitems.all()
+                items = [getattr(i, "name") for i in dbitems]
+                print items
+            else:
+                dbitems = dbitems.filter(_model.name.in_(items)).all()
 
         # assert if invalid items
         assert len(items) == len(dbitems)
