@@ -226,7 +226,6 @@ class LibSyncer(object):
             if items[0] == "*":
                 dbitems = dbitems.all()
                 items = [getattr(i, "name") for i in dbitems]
-                print items
             else:
                 dbitems = dbitems.filter(_model.name.in_(items)).all()
 
