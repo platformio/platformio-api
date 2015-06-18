@@ -322,6 +322,8 @@ class LibSyncer(object):
                     for item in glob(join(srcdir, pathname)):
                         dstpath = join(archdir, item[len(srcdir)+1:])
                         if isfile(item):
+                            if not isdir(dirname(dstpath)):
+                                makedirs(dirname(dstpath))
                             copy(item, dstpath)
                         else:
                             copytree(item, dstpath)
@@ -375,12 +377,9 @@ class LibSyncer(object):
                         )
             self.sync_examples(exmfiles)
         finally:
-            if archdir and exists(archdir):
-                rmtree(archdir)
-            if srcdir and exists(srcdir):
-                rmtree(srcdir)
-            if examples_dir and exists(examples_dir):
-                rmtree(examples_dir)
+            for d in (archdir, srcdir, examples_dir):
+                if d and exists(d):
+                    rmtree(d)
 
     def sync_examples(self, files):
         # clean previous examples
