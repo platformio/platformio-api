@@ -7,7 +7,7 @@ import os
 from time import tzset
 
 
-VERSION = (0, 6, 1)
+VERSION = (0, 6, 2)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
@@ -26,7 +26,7 @@ config = dict(
     GITHUB_PASSWORD=None,
     DL_PIO_DIR=None,
     DL_PIO_URL=None,
-    MAX_DLFILE_SIZE=1024*1024*50,  # 50 Mb
+    MAX_DLFILE_SIZE=1024 * 1024 * 50,  # 50 Mb
     LOGGING=dict(version=1)
 )
 
