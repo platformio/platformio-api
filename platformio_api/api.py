@@ -86,7 +86,7 @@ class PackagesManifestAPI(APIBase):
                 __version__, requests.utils.default_user_agent())}
             r = requests.get(
                 "http://sourceforge.net/projects/platformio-storage/files/"
-                "packages/manifest.json", headers=headers)
+                "packages/manifest.json", headers=headers, timeout=3)
             result = r.json()
             r.raise_for_status()
         except:
