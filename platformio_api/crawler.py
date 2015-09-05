@@ -329,17 +329,17 @@ class LibSyncer(object):
                             copytree(item, dstpath)
             # if "include" is a string then use it like a "mount" point
             elif isinstance(inclist, basestring):
-                srcpath = join(srcdir, inclist)
-                if isfile(srcpath):
-                    copy(srcpath, join(archdir, inclist))
-                else:
-                    for item in listdir(srcpath):
-                        itempath = join(srcpath, item)
-                        dstpath = join(archdir, item)
-                        if isfile(itempath):
-                            copy(itempath, dstpath)
-                        else:
-                            copytree(itempath, dstpath)
+                for item in glob(join(srcdir, inclist)):
+                    if isfile(item):
+                        copy(item, join(archdir, basename(item)))
+                    else:
+                        for item2 in listdir(item):
+                            itempath = join(item, item2)
+                            dstpath = join(archdir, item2)
+                            if isfile(itempath):
+                                copy(itempath, dstpath)
+                            else:
+                                copytree(itempath, dstpath)
 
             # put original library.json & modified .library.json
             with open(join(archdir, ".library.json"), "w") as f:

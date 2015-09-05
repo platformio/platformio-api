@@ -7,7 +7,7 @@ import os
 from time import tzset
 
 
-VERSION = (0, 6, 4)
+VERSION = (0, 6, 5)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
