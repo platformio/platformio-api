@@ -112,7 +112,9 @@ class PlatformsAPI(APIBase):
                 'name': p.get_name(),
                 'description': p.get_description(),
                 'url': p.get_vendor_url(),
-                'packages': p.get_packages().keys()
+                'packages': p.get_packages().keys(),
+                'forDesktop': any([
+                    type_.startswith(n) for n in ("native", "linux", "windows")])
             })
         return sorted(result, key=lambda item: item['type'])
 
