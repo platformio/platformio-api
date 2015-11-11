@@ -29,6 +29,8 @@ class CVSClientFactory(object):
             type_ = "github"
         if "developer.mbed.org" in url:
             type_ = "mbed"
+        if "bitbucket.org" in url:
+            type_ = "bitbucket"
         clsname = "%sClient" % type_.title()
         obj = getattr(modules[__name__], clsname)(url)
         assert isinstance(obj, BaseClient)
@@ -182,3 +184,42 @@ class MbedClient(BaseClient):
                 rmtree(destination_dir)
             mkdir(destination_dir)
             check_call(["hg", "clone", self.url, destination_dir])
+
+
+class BitbucketClient(BaseClient):
+
+    COMMITS_URL = "https://bitbucket.org/" \
+                  "api/2.0/repositories/%(owner)s/%(repo_slug)s/commits"
+    ARCHIVE_URL = "https://bitbucket.org/" \
+                  "%(owner)s/%(repo_slug)s/get/%(hash)s.tar.gz"
+
+    def __init__(self, url):
+        BaseClient.__init__(self, url)
+        self._last_commit = None
+
+        # Extract username and repo slug from url
+        _, valuable_part = self.url.split("bitbucket.org/")
+        parts = valuable_part.split('/')
+        self.owner = parts[0]
+        self.repo_slug = parts[1]
+
+    def get_last_commit(self, path=None):
+        if self._last_commit is not None:
+            return self._last_commit
+
+        response = requests.get(self.COMMITS_URL % dict(
+            owner=self.owner,
+            repo_slug=self.repo_slug,
+        ))
+        assert 200 == response.status_code, "Bitbucket API request failed"
+
+        commit = response.json()["values"][0]
+        self._last_commit = dict(sha=commit["hash"], date=commit["date"])
+        return self._last_commit
+
+    def clone(self, destination_dir):
+        url = self.ARCHIVE_URL % dict(
+            owner=self.owner, repo_slug=self.repo_slug,
+            hash=self.get_last_commit()['sha']
+        )
+        self._download_and_unpack_archive(url, destination_dir)

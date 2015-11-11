@@ -126,8 +126,9 @@ def validate_libconf(data):
     if "repository" in data:
         type = data['repository'].get("type", None)
         url = data['repository'].get("url", "")
-        if ((type == "git" and "github.com" in url)  # github
-                or (type == "hg" and "developer.mbed.org" in url)):  # mbed
+        if (type == "git" and "github.com" in url) \
+                or (type == "hg" and "developer.mbed.org" in url)  \
+                or (type in ["hg", "git"] and "bitbucket.org" in url):
             return data
 
     # if CVS-based
