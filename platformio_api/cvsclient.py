@@ -202,7 +202,6 @@ class BitbucketClient(BaseClient):
         parts = valuable_part.split('/')
         self.owner = parts[0]
         self.repo_slug = parts[1]
-        print(self.owner, self.repo_slug)
 
     def get_last_commit(self, path=None):
         if self._last_commit is not None:
