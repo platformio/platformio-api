@@ -1,4 +1,4 @@
 PlatformIO-API
 ==============
 
-An API for `PlatformIO <https://github.com/ivankravets/platformio>`_.
+An API for `https://platformio.org <https://platformio.org>`_.

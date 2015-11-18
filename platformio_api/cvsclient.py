@@ -1,5 +1,16 @@
-# Copyright (C) Ivan Kravets <me@ikravets.com>
-# See LICENSE for details.
+# Copyright 2014-2015 Ivan Kravets <me@ikravets.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import logging
 import re
@@ -137,7 +148,7 @@ class GithubClient(BaseClient):
             api = BlockingBuilder().Login(
                 config['GITHUB_LOGIN'], config['GITHUB_PASSWORD']).Build()
 
-            _url = self.url[self.url.index("github.com/")+11:]
+            _url = self.url[self.url.index("github.com/") + 11:]
             if _url.endswith(".git"):
                 _url = _url[:-4]
             _login, _reponame = _url.split("/")[:2]

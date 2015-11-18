@@ -1,5 +1,16 @@
-# Copyright (C) Ivan Kravets <me@ikravets.com>
-# See LICENSE for details.
+# Copyright 2014-2015 Ivan Kravets <me@ikravets.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import json
 import logging
@@ -198,7 +209,7 @@ class LibSyncer(object):
             self.lib.keywords.append(item)
 
         for item in (set(keywords) - existing):
-                self.lib.keywords.append(models.Keywords(name=item))
+            self.lib.keywords.append(models.Keywords(name=item))
 
         # save in string format for FTS
         self.lib.fts.keywords = ",".join(keywords)
@@ -306,7 +317,7 @@ class LibSyncer(object):
             # delete excluded items
             exclist = self.config.get("exclude", [])
             if isinstance(exclist, basestring):
-                    exclist = [exclist]
+                exclist = [exclist]
             for pathname in exclist:
                 for item in glob(join(srcdir, pathname)):
                     if isfile(item):
@@ -320,7 +331,7 @@ class LibSyncer(object):
             elif isinstance(inclist, list):
                 for pathname in inclist:
                     for item in glob(join(srcdir, pathname)):
-                        dstpath = join(archdir, item[len(srcdir)+1:])
+                        dstpath = join(archdir, item[len(srcdir) + 1:])
                         if isfile(item):
                             if not isdir(dirname(dstpath)):
                                 makedirs(dirname(dstpath))

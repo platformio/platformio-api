@@ -1,5 +1,16 @@
-# Copyright (C) Ivan Kravets <me@ikravets.com>
-# See LICENSE for details.
+# Copyright 2014-2015 Ivan Kravets <me@ikravets.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from contextlib import contextmanager
 from glob import glob
@@ -82,7 +93,7 @@ def get_libarch_relpath(lib_id, version_id):
     lib_id = int(lib_id)
     version_id = int(version_id)
     assert lib_id > 0 and version_id > 0
-    return join("libraries", "archives", str(int(ceil(lib_id/100))),
+    return join("libraries", "archives", str(int(ceil(lib_id / 100))),
                 "%d.tar.gz" % version_id)
 
 
@@ -99,7 +110,7 @@ def get_libexample_relpath(lib_id):
     lib_id = int(lib_id)
     assert lib_id > 0
     return join("libraries", "examples",
-                str(int(ceil(lib_id/100))), str(lib_id))
+                str(int(ceil(lib_id / 100))), str(lib_id))
 
 
 def get_libexample_dir(lib_id):
