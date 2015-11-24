@@ -214,7 +214,10 @@ class BitbucketClient(BaseClient):
         assert 200 == response.status_code, "Bitbucket API request failed"
 
         commit = response.json()["values"][0]
-        self._last_commit = dict(sha=commit["hash"], date=commit["date"])
+        self._last_commit = dict(
+            sha=commit["hash"],
+            date=datetime.strptime(commit["date"], "%Y-%m-%dT%H:%M:%S+00:00")
+        )
         return self._last_commit
 
     def clone(self, destination_dir):
