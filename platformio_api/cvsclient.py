@@ -116,7 +116,7 @@ class GithubClient(BaseClient):
                 path=path, per_page=1))
 
             if commits:
-                commit = commits[1]
+                commit = commits[0]
 
             if commit or not path or path == "/":
                 break
