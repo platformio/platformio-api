@@ -23,7 +23,7 @@ from sys import modules
 from tempfile import mkdtemp, mkstemp
 
 import requests
-from PyGithub import BlockingBuilder
+from github import Github, GithubObject
 
 from platformio_api import config
 from platformio_api.util import download_file, extract_archive
@@ -108,12 +108,13 @@ class GithubClient(BaseClient):
         self._repoapi = None
 
     def get_last_commit(self, path=None):
+        path = path or GithubObject.NotSet
+
         commit = None
         folder_depth = 20
         while folder_depth:
             folder_depth -= 1
-            commits = list(self._repoapi_instance().get_commits(
-                path=path, per_page=1))
+            commits = list(self._repoapi_instance().get_commits(path=path))
 
             if commits:
                 commit = commits[0]
@@ -145,14 +146,13 @@ class GithubClient(BaseClient):
 
     def _repoapi_instance(self):
         if self._repoapi is None:
-            api = BlockingBuilder().Login(
-                config['GITHUB_LOGIN'], config['GITHUB_PASSWORD']).Build()
+            api = Github(config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'])
 
-            _url = self.url[self.url.index("github.com/") + 11:]
-            if _url.endswith(".git"):
-                _url = _url[:-4]
-            _login, _reponame = _url.split("/")[:2]
-            self._repoapi = api.get_repo((_login, _reponame))
+            repo = self.url[self.url.index("github.com/") + 11:]
+            if repo.endswith(".git"):
+                repo = repo[:-4]
+            repo = repo.rstrip("/")
+            self._repoapi = api.get_repo(repo)
 
         return self._repoapi
 
