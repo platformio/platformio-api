@@ -28,11 +28,12 @@ setup(
     license=__license__,
     install_requires=[
         "platformio",
-        "click",
+        "click<6",
         "bottle",
         "MySQL-python",
         "SQLAlchemy",
-        "requests"
+        "requests",
+        "PyGithub>=1.26,<2"
     ],
     packages=find_packages(),
     entry_points={
