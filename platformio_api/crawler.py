@@ -301,9 +301,7 @@ class LibSyncer(object):
         examples_dir = None
 
         try:
-            if self.cvsclient:
-                self.cvsclient.clone(srcdir)
-            elif "downloadUrl" in self.config:
+            if "downloadUrl" in self.config:
                 try:
                     tmparh_path = mkstemp(basename(
                         self.config['downloadUrl']))[1]
@@ -311,6 +309,8 @@ class LibSyncer(object):
                     util.extract_archive(tmparh_path, srcdir)
                 finally:
                     remove(tmparh_path)
+            elif self.cvsclient:
+                self.cvsclient.clone(srcdir)
             else:
                 raise LibArchiveError()
 
