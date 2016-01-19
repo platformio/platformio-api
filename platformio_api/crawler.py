@@ -372,7 +372,7 @@ class LibSyncer(object):
             exmglobs = self.config.get("examples", None)
             exmfiles = []
             if exmglobs is None:
-                for ext in ("*.ino", "*.pde"):
+                for ext in ("*.ino", "*.pde", "*.c", "*.cpp", "*.h"):
                     exmfiles += glob(join(archdir, "[Ee]xamples", "*", ext))
             else:
                 if not isinstance(exmglobs, list):
