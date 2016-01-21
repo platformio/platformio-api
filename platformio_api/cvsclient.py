@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class CVSClientFactory(object):
 
     @staticmethod
-    def newClient(type_, url):
+    def newClient(type_, url, branch=None):
         assert type_ in ("git", "svn", "hg")
         if "github.com/" in url:
             type_ = "github"
@@ -43,15 +43,16 @@ class CVSClientFactory(object):
         if "bitbucket.org" in url:
             type_ = "bitbucket"
         clsname = "%sClient" % type_.title()
-        obj = getattr(modules[__name__], clsname)(url)
+        obj = getattr(modules[__name__], clsname)(url, branch)
         assert isinstance(obj, BaseClient)
         return obj
 
 
 class BaseClient(object):
 
-    def __init__(self, url):
+    def __init__(self, url, branch):
         self.url = url
+        self.branch = branch
 
     def clone(self, destination_dir):
         raise NotImplementedError()
@@ -85,36 +86,38 @@ class BaseClient(object):
 
 class GitClient(BaseClient):
 
-    def __init__(self, url):
+    def __init__(self, url, branch):
         raise NotImplementedError()
 
 
 class HgClient(BaseClient):
 
-    def __init__(self, url):
+    def __init__(self, url, branch):
         raise NotImplementedError()
 
 
 class SvnClient(BaseClient):
 
-    def __init__(self, url):
+    def __init__(self, url, branch):
         raise NotImplementedError()
 
 
 class GithubClient(BaseClient):
 
-    def __init__(self, url):
-        BaseClient.__init__(self, url)
+    def __init__(self, url, branch):
+        BaseClient.__init__(self, url, branch)
         self._repoapi = None
 
     def get_last_commit(self, path=None):
         path = path or GithubObject.NotSet
 
         commit = None
+        repo = self._repoapi_instance()
         folder_depth = 20
         while folder_depth:
             folder_depth -= 1
-            commits = list(self._repoapi_instance().get_commits(path=path))
+            commits = repo.get_commits(sha=self.branch or repo.default_branch,
+                                       path=path)
 
             if commits:
                 commit = commits[0]
@@ -140,7 +143,7 @@ class GithubClient(BaseClient):
     def clone(self, destination_dir):
         api = self._repoapi_instance()
         url = ("https://codeload.github.com/%s/legacy.tar.gz/%s" % (
-            api.full_name, api.default_branch
+            api.full_name, self.branch or api.default_branch
         ))
         self._download_and_unpack_archive(url, destination_dir)
 
@@ -159,8 +162,8 @@ class GithubClient(BaseClient):
 
 class MbedClient(BaseClient):
 
-    def __init__(self, url):
-        BaseClient.__init__(self, url)
+    def __init__(self, url, branch):
+        BaseClient.__init__(self, url, branch)
         self._last_commit = None
 
     def get_last_commit(self, path=None):
@@ -199,13 +202,16 @@ class MbedClient(BaseClient):
 
 class BitbucketClient(BaseClient):
 
+    MAIN_BRANCH_URL = "https://api.bitbucket.org/1.0/repositories/%(owner)s/" \
+                      "%(repo_slug)s/main-branch"
     COMMITS_URL = "https://bitbucket.org/" \
-                  "api/2.0/repositories/%(owner)s/%(repo_slug)s/commits"
+                  "api/2.0/repositories/%(owner)s/%(repo_slug)s/commits/" \
+                  "%(revision)s"
     ARCHIVE_URL = "https://bitbucket.org/" \
                   "%(owner)s/%(repo_slug)s/get/%(hash)s.tar.gz"
 
-    def __init__(self, url):
-        BaseClient.__init__(self, url)
+    def __init__(self, url, branch):
+        BaseClient.__init__(self, url, branch)
         self._last_commit = None
 
         # Extract username and repo slug from url
@@ -218,9 +224,13 @@ class BitbucketClient(BaseClient):
         if self._last_commit is not None:
             return self._last_commit
 
+        if not self.branch:
+            self.retrieve_main_branch()
+
         response = requests.get(self.COMMITS_URL % dict(
             owner=self.owner,
             repo_slug=self.repo_slug,
+            revision=self.branch,
         ))
         assert 200 == response.status_code, "Bitbucket API request failed"
 
@@ -237,3 +247,12 @@ class BitbucketClient(BaseClient):
             hash=self.get_last_commit()['sha']
         )
         self._download_and_unpack_archive(url, destination_dir)
+
+    def retrieve_main_branch(self):
+        response = requests.get(self.MAIN_BRANCH_URL % dict(
+            owner=self.owner,
+            repo_slug=self.repo_slug,
+        ))
+        assert 200 == response.status_code, "Bitbucket API request failed"
+
+        self.branch = response.json()["name"]

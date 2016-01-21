@@ -54,9 +54,10 @@ class LibSyncer(object):
         self.cvsclient = None
         if "repository" in self.config:
             _type = self.config['repository'].get("type", "").lower()
-            _url = self.config['repository'].get("url", "")
-            if _type and _url:
-                self.cvsclient = CVSClientFactory.newClient(_type, _url)
+            url = self.config['repository'].get("url", "")
+            branch = self.config['repository'].get("branch", None)
+            if _type and url:
+                self.cvsclient = CVSClientFactory.newClient(_type, url, branch)
 
     def clean_dict(self, data):
         for (key, _) in (data.iteritems() if isinstance(data, dict) else
