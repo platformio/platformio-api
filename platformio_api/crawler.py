@@ -311,7 +311,17 @@ class LibSyncer(object):
                 finally:
                     remove(tmparh_path)
             elif self.cvsclient:
-                self.cvsclient.clone(srcdir)
+                try:
+                    # Attempt to clone the exact version tag
+                    revision = "v" + self.config["version"]
+                    self.cvsclient.clone(srcdir, revision)
+                except:
+                    # Fallback to cloning the branch
+                    try:
+                        rmtree(srcdir)
+                    except OSError:
+                        srcdir = mkdtemp()
+                    self.cvsclient.clone(srcdir)
             else:
                 raise LibArchiveError()
 

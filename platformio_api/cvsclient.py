@@ -54,7 +54,14 @@ class BaseClient(object):
         self.url = url
         self.branch = branch
 
-    def clone(self, destination_dir):
+    def clone(self, destination_dir, revision=None):
+        """Clone the source code into the destination_dir.
+
+        Optional `revision` argument may be the identifier of commit (usually
+        SHA1), branch name or tag name. Defaults to the last commit in the
+        branch specified during initialization. If branch is not specified,
+        main repository branch will be used.
+        """
         raise NotImplementedError()
 
     def get_last_commit(self):
@@ -140,10 +147,12 @@ class GithubClient(BaseClient):
             url=api.owner.html_url
         )
 
-    def clone(self, destination_dir):
+    def clone(self, destination_dir, revision=None):
         api = self._repoapi_instance()
+        if revision is None:
+            revision = self.branch or api.default_branch
         url = ("https://codeload.github.com/%s/legacy.tar.gz/%s" % (
-            api.full_name, self.branch or api.default_branch
+            api.full_name, revision
         ))
         self._download_and_unpack_archive(url, destination_dir)
 
@@ -186,10 +195,12 @@ class MbedClient(BaseClient):
         )
         return self._last_commit
 
-    def clone(self, destination_dir):
+    def clone(self, destination_dir, revision=None):
+        if revision is None:
+            revision = self.get_last_commit()['sha']
         try:
-            archive_url = "%(repo_url)sarchive/%(sha)s.tar.gz" % dict(
-                repo_url=self.url, sha=self.get_last_commit()['sha'])
+            archive_url = "%(repo_url)sarchive/%(revision)s.tar.gz" % dict(
+                repo_url=self.url, revision=revision)
             self._download_and_unpack_archive(archive_url, destination_dir)
         except CalledProcessError:
             logger.info("Unable to extract repo archive. Cloning archive with "
@@ -197,7 +208,8 @@ class MbedClient(BaseClient):
             if exists(destination_dir):
                 rmtree(destination_dir)
             mkdir(destination_dir)
-            check_call(["hg", "clone", self.url, destination_dir])
+            check_call(["hg", "clone", "--updaterev", revision, self.url,
+                        destination_dir])
 
 
 class BitbucketClient(BaseClient):
@@ -208,7 +220,7 @@ class BitbucketClient(BaseClient):
                   "api/2.0/repositories/%(owner)s/%(repo_slug)s/commits/" \
                   "%(revision)s"
     ARCHIVE_URL = "https://bitbucket.org/" \
-                  "%(owner)s/%(repo_slug)s/get/%(hash)s.tar.gz"
+                  "%(owner)s/%(repo_slug)s/get/%(revision)s.tar.gz"
 
     def __init__(self, url, branch):
         BaseClient.__init__(self, url, branch)
@@ -241,10 +253,12 @@ class BitbucketClient(BaseClient):
         )
         return self._last_commit
 
-    def clone(self, destination_dir):
+    def clone(self, destination_dir, revision=None):
+        if revision is None:
+            revision = self.get_last_commit()['sha']
         url = self.ARCHIVE_URL % dict(
             owner=self.owner, repo_slug=self.repo_slug,
-            hash=self.get_last_commit()['sha']
+            revision=revision,
         )
         self._download_and_unpack_archive(url, destination_dir)
 
