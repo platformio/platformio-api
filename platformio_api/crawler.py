@@ -320,7 +320,8 @@ class LibSyncer(object):
                     try:
                         rmtree(srcdir)
                     except OSError:
-                        srcdir = mkdtemp()
+                        pass
+                    srcdir = mkdtemp()
                     self.cvsclient.clone(srcdir)
             else:
                 raise LibArchiveError()
