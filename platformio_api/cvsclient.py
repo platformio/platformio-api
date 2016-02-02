@@ -120,10 +120,11 @@ class GithubClient(BaseClient):
 
         commit = None
         repo = self._repoapi_instance()
+        revision = self.branch or repo.default_branch or GithubObject.NotSet
         folder_depth = 20
         while folder_depth:
             folder_depth -= 1
-            commits = repo.get_commits(sha=self.branch or repo.default_branch,
+            commits = repo.get_commits(sha=revision,
                                        path=path)
 
             if commits:
