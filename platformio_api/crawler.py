@@ -112,7 +112,8 @@ class LibSyncer(object):
         if self.lib.fts is None:
             self.lib.fts = models.LibFTS(name=self.config['name'])
         self.lib.fts.name = self.config['name']
-        self.lib.fts.description = self.config.get("description", None)
+        self.lib.fts.description = \
+            self.config.get("description", "")[:255] or None
 
         self.config['authors'] = self.sync_authors(
             self.config.get("authors", None))
