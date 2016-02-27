@@ -28,6 +28,17 @@ logger = logging.getLogger(__name__)
 
 
 def process_pending_libs():
+
+    def get_free_lib_id():
+        free_id = 0
+        query = db_session.query(models.Libs.id).order_by(
+            models.Libs.id.asc())
+        for item in query.all():
+            free_id += 1
+            if item[0] > free_id:
+                break
+        return free_id
+
     query = db_session.query(models.PendingLibs, models.Libs.id).filter(
         ~models.PendingLibs.processed, models.PendingLibs.approved).outerjoin(
             models.Libs, models.PendingLibs.conf_url == models.Libs.conf_url)
@@ -37,7 +48,9 @@ def process_pending_libs():
         if lib_id:
             continue
         with util.rollback_on_exception(db_session, logger):
-            lib = models.Libs(conf_url=item.conf_url)
+            lib = models.Libs(
+                id=get_free_lib_id(),
+                conf_url=item.conf_url)
             lib.dlstats = models.LibDLStats(day=0, week=0, month=0)
             db_session.add(lib)
 

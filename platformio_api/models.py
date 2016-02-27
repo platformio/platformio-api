@@ -66,7 +66,7 @@ class Keywords(Base):
 class Libs(Base):
     __tablename__ = "libs"
 
-    id = Column(INTEGER(unsigned=True), primary_key=True)
+    id = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=False)
     latest_version_id = Column(INTEGER(unsigned=True))
     conf_url = Column(String(200), nullable=False)
     conf_sha1 = Column(String(40))
