@@ -655,7 +655,7 @@ class LibStatsAPI(APIBase):
         items = []
         query = db_session.query(
             models.Libs.id, models.Libs.updated, models.LibFTS.name
-        ).join(models.LibFTS).order_by(models.Libs.id.desc()).limit(limit)
+        ).join(models.LibFTS).order_by(models.Libs.added.desc()).limit(limit)
         for item in query.all():
             items.append(dict(
                 id=item[0],

@@ -71,6 +71,8 @@ class Libs(Base):
     conf_url = Column(String(200), nullable=False)
     conf_sha1 = Column(String(40))
     example_nums = Column(SMALLINT(unsigned=True))
+    added = Column(DateTime, nullable=False, default=datetime.utcnow,
+                   index=True)
     updated = Column(DateTime, nullable=False, default=datetime.utcnow,
                      index=True)
     synced = Column(DateTime, nullable=False, default=datetime.utcnow)
