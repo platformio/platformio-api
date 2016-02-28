@@ -654,7 +654,7 @@ class LibStatsAPI(APIBase):
     def _get_last_added(self, limit=5):
         items = []
         query = db_session.query(
-            models.Libs.id, models.Libs.updated, models.LibFTS.name
+            models.Libs.id, models.Libs.added, models.LibFTS.name
         ).join(models.LibFTS).order_by(models.Libs.added.desc()).limit(limit)
         for item in query.all():
             items.append(dict(
