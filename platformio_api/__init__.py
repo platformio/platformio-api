@@ -38,6 +38,7 @@ config = dict(
     DL_PIO_DIR=None,
     DL_PIO_URL=None,
     MAX_DLFILE_SIZE=1024 * 1024 * 50,  # 50 Mb
+    SOLR_LIBS_URI=None,  # http://{host}:{port}/solr/{core}
     LOGGING=dict(version=1)
 )
 
