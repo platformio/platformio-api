@@ -243,7 +243,8 @@ class LibSearchSolrAPI(APIBase):
                     field = "%s:" % readable
                     if token.startswith(field):
                         token_used = True
-                        items.append("%s:*%s~*" % (actual, token[len(field):]))
+                        fmt = "%s:%s" if actual == "keywords" else "%s:*%s~*"
+                        items.append(fmt % (actual, token[len(field):]))
                         break
 
             if not token_used:
