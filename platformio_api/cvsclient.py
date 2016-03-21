@@ -85,7 +85,11 @@ class BaseClient(object):
                 if isfile(item_path):
                     copy(item_path, join(destination_dir, item))
                 else:
-                    copytree(item_path, join(destination_dir, item))
+                    copytree(
+                        item_path,
+                        join(destination_dir, item),
+                        symlinks=True
+                    )
         finally:
             remove(arch_path)
             rmtree(tmpdir)

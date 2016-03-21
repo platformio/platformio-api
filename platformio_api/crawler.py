@@ -356,7 +356,7 @@ class LibSyncer(object):
                                 makedirs(dirname(dstpath))
                             copy(item, dstpath)
                         else:
-                            copytree(item, dstpath)
+                            copytree(item, dstpath, symlinks=True)
             # if "include" is a string then use it like a "mount" point
             elif isinstance(inclist, basestring):
                 for item in glob(join(srcdir, inclist)):
@@ -369,7 +369,7 @@ class LibSyncer(object):
                             if isfile(itempath):
                                 copy(itempath, dstpath)
                             else:
-                                copytree(itempath, dstpath)
+                                copytree(itempath, dstpath, symlinks=True)
 
             # put original library.json & modified .library.json
             with open(join(archdir, ".library.json"), "w") as f:
