@@ -169,7 +169,7 @@ class LibFTS(Base):
     examplefiles = Column(Text(), nullable=False)
     authornames = Column(String(255), nullable=False)
     frameworkslist = Column(String(255), nullable=False)
-    platformslist = Column(String(255), nullable=False)
+    platformslist = Column(Text(), nullable=False)
 
 
 class LibsKeywords(Base):
