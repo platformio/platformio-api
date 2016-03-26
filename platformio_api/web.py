@@ -118,7 +118,7 @@ def lib_search():
     return finalize_json_response(api.LibSearchAPI, args)
 
 
-@app.route("/lib/search_solr")
+@app.route("/lib/search_v2")
 def lib_search_solr():
     args = dict(
         query=unquote(request.query.query[:255]),
