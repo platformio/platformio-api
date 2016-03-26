@@ -71,14 +71,27 @@ def sync_libs():
         .filter(models.Libs.synced < datetime.utcnow() - timedelta(days=1),
                 models.Libs.active)
     for item in query.all():
-        sync_succeeded = False
-        with util.rollback_on_exception(db_session, logger):
-            ls = LibSyncer(item)
-            sync_succeeded = ls.sync()
-            if sync_succeeded:
-                item.synced = datetime.utcnow()
-        item.active = bool(sync_succeeded)
-        db_session.commit()
+        sync_lib(item)
+
+
+def sync_lib(item):
+    sync_succeeded = False
+    with util.rollback_on_exception(db_session, logger):
+        ls = LibSyncer(item)
+        sync_succeeded = ls.sync()
+        if sync_succeeded:
+            item.synced = datetime.utcnow()
+    item.active = bool(sync_succeeded)
+    db_session.commit()
+
+
+def sync_lib_by_id(lib_id):
+    item = db_session.query(models.Libs).get(lib_id)
+    if not item:
+        print "Library with id={} not found.".format(lib_id)
+        return
+
+    sync_lib(item)
 
 
 def rotate_libs_dlstats():

@@ -45,6 +45,12 @@ def synclibs():
 
 
 @cli.command()
+@argument('lib_id', type=int)
+def sync_lib(lib_id):
+    maintenance.sync_lib_by_id(lib_id)
+
+
+@cli.command()
 def rotatelibsdlstats():
     maintenance.rotate_libs_dlstats()
 
