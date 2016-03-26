@@ -186,3 +186,11 @@ def rollback_on_exception_decorator(session, logger=None):
                 f(*args, **kwargs)
         return wrapped
     return actual_decorator
+
+
+def parse_namedtitled_list(ntlist):
+    items = []
+    for item in ntlist.split(","):
+        if ":" in item:
+            items.append(item.split(":")[0])
+    return items

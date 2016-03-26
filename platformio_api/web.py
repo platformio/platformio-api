@@ -118,6 +118,16 @@ def lib_search():
     return finalize_json_response(api.LibSearchAPI, args)
 
 
+@app.route("/lib/search_v2")
+def lib_search_solr():
+    args = dict(
+        query=unquote(request.query.query[:255]),
+        page=int(request.query.page) if request.query.page else 0,
+        # perpage=int(request.query.perpage) if request.query.perpage else 0
+    )
+    return finalize_json_response(api.LibSearchSolrAPI, args)
+
+
 @app.route("/lib/examples")
 def lib_examples():
     args = dict(

@@ -27,6 +27,8 @@ from sqlalchemy.orm.exc import NoResultFound
 from platformio_api import __version__, models, util
 from platformio_api.database import Match, db_session
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
+from platformio_api.solr import solr_libs
+from platformio_api.util import parse_namedtitled_list
 
 
 logger = logging.getLogger(__name__)
@@ -130,6 +132,132 @@ class PlatformsAPI(APIBase):
         return sorted(result, key=lambda item: item['type'])
 
 
+class LibSearchSolrAPI(APIBase):
+
+    ITEMS_PER_PAGE = 10
+
+    def __init__(self, query=None, page=1, perpage=None):
+        self.search_query = self.prepare_search_query(query)
+
+        self.page = page
+        self.perpage = perpage or self.ITEMS_PER_PAGE
+
+        if self.perpage < 1 or self.perpage > self.ITEMS_PER_PAGE:
+            self.perpage = self.ITEMS_PER_PAGE
+
+        if self.page < 1:
+            self.page = 1
+
+    def get_result(self):
+        result = solr_libs.search(
+            self.search_query,
+            params={
+                'start': (self.page - 1) * self.perpage,
+                'rows': self.perpage,
+            },
+        ).json()
+        _docs = result.get('response', {}).get('docs', [])
+
+        ids = []
+        for doc in _docs:
+            try:
+                ids.append(int(doc['id']))
+            except ValueError as e:
+                logger.exception(e)
+
+        query = db_session.query(models.Libs)\
+            .join(models.Libs.fts)\
+            .join(models.Libs.dlstats)\
+            .filter(models.Libs.id.in_(ids))
+        db_entries = {lib.id: lib for lib in query.all()}
+
+        items = []
+        # Iterating over the original Solr response to preserve the order
+        for doc in _docs:
+            try:
+                lib_id = int(doc['id'])
+            except ValueError:
+                # This error should have been logged above, when list of IDs
+                # is created. No reason to duplicate the exception.
+                pass
+
+            lib = db_entries.get(lib_id)
+            if not lib:
+                logger.warn(
+                    "Lib #{} was in Solr response, but is not found in DB. "
+                    "Consider running `platformio-api synchronize_libs_on_solr"
+                    "` to remove any outdated libraries from index."
+                    .format(lib_id)
+                )
+                continue
+            items.append(dict(
+                id=lib.id,
+                name=lib.fts.name,
+                description=lib.fts.description,
+                keywords=lib.fts.keywords.split(","),
+                authornames=lib.fts.authornames.split(","),
+                frameworks=parse_namedtitled_list(lib.fts.frameworkslist),
+                platforms=parse_namedtitled_list(lib.fts.platformslist),
+                dlmonth=lib.dlstats.month,
+                examplenums=lib.example_nums,
+                updated=lib.updated.strftime("%Y-%m-%dT%H:%M:%SZ")
+            ))
+
+        return dict(
+            total=result.get('response', {}).get('numFound', 0),
+            page=self.page,
+            perpage=self.perpage,
+            items=items,
+        )
+
+    @staticmethod
+    def prepare_search_query(initial_query):
+        """Prepares a user query for Solr.
+
+        Currently this method does the following:
+            - adds "~" everywhere in order to turn a fuzzy search on;
+            - renames fields to match its actual names.
+
+        :param initial_query: a user-specified query
+        :type initial_query: unicode
+        :return: a processed query
+        :rtype: unicode
+        """
+
+        query_param_to_solr_field_map = {
+            "author": "authornames",
+            "keyword": "keywords",
+            "framework": "frameworkslist",
+            "platform": "platformslist",
+        }
+        items = []
+
+        # Show all documents by default
+        if initial_query == "*" or not initial_query:
+            items.append("*:*")
+
+        for token in initial_query.split(" "):
+            token_used = False
+            if ":" in token:
+                for readable, actual in query_param_to_solr_field_map.items():
+                    field = "%s:" % readable
+                    if token.startswith(field):
+                        token_used = True
+                        fmt = "%s:%s" if actual == "keywords" else "%s:*%s~*"
+                        items.append(fmt % (actual, token[len(field):]))
+                        break
+
+            if not token_used:
+                if token.endswith('\\"'):
+                    # Enable both fuzzy and proximity (allow words to appear
+                    # not consecutively in searched documents)
+                    items.append(token[:-2] + '~\\"~')
+                else:
+                    items.append(token + "~")  # enable fuzzy search
+
+        return " ".join(items)
+
+
 class LibSearchAPI(APIBase):
 
     ITEMS_PER_PAGE = 10
@@ -167,8 +295,8 @@ class LibSearchAPI(APIBase):
                 description=lib_description,
                 keywords=lib_keywords.split(","),
                 authornames=authornames.split(","),
-                frameworks=self.parse_namedtitled_list(frameworkslist),
-                platforms=self.parse_namedtitled_list(platformslist),
+                frameworks=parse_namedtitled_list(frameworkslist),
+                platforms=parse_namedtitled_list(platformslist),
                 dlmonth=dlmonth,
                 examplenums=example_nums,
                 updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -179,13 +307,6 @@ class LibSearchAPI(APIBase):
             perpage=self.perpage,
             items=items
         )
-
-    def parse_namedtitled_list(self, ntlist):
-        items = []
-        for item in ntlist.split(","):
-            if ":" in item:
-                items.append(item.split(":")[0])
-        return items
 
     def parse_search_query(self, query):
         quote = "\""
@@ -345,8 +466,8 @@ class LibExamplesAPI(LibSearchAPI):
                     description=lib_description,
                     keywords=lib_keywords.split(","),
                     authornames=authornames.split(","),
-                    frameworks=self.parse_namedtitled_list(frameworkslist),
-                    platforms=self.parse_namedtitled_list(platformslist)
+                    frameworks=parse_namedtitled_list(frameworkslist),
+                    platforms=parse_namedtitled_list(platformslist)
                 )
             ))
         return dict(
