@@ -431,6 +431,8 @@ class LibSearchSolrAPI(LibSearchAPI):
             if param in query_param_to_solr_field_map:
                 param = query_param_to_solr_field_map[param]
             for value in values:
+                if " " in value:
+                    value = '"%s"' % value
                 filters.append("%s:%s" % (param, value))
 
         return " ".join(chain(words, filters))
