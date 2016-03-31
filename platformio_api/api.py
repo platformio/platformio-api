@@ -406,7 +406,10 @@ class LibSearchSolrAPI(LibSearchAPI):
         :rtype: unicode
         """
         words = search_query.get('words', [])
+        if "*" in words:
+            words.remove("*")
         params = search_query.get('params', {})
+        params = {k: v for k, v in params.items() if v}  # skip empty filters
 
         query_param_to_solr_field_map = {
             "authors": "authornames",
