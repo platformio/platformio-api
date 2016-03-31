@@ -191,7 +191,7 @@ class LibSearchAPI(APIBase):
             "keywords": [],
             "frameworks": [],
             "platforms": [],
-            "name": [],
+            "names": [],
         }
         state = {key: None for key in params.keys()}
 
@@ -413,13 +413,14 @@ class LibSearchSolrAPI(LibSearchAPI):
             "keywords": "keywords",
             "frameworks": "frameworkslist",
             "platforms": "platformslist",
+            "names": "name",
         }
 
         threshold = config['SOLR_FUZZY_MIN_WORD_LENGTH']
         if not strict:
             words = [word + "~" if len(word) > threshold else word
                      for word in words]
-        if not words:
+        if not words and not params:
             words = ["*:*"]
 
         filters = []
