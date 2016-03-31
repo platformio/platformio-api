@@ -1,0 +1,7 @@
+# !!! This file does not contain a complete list of platofrmio-api requirements !!!
+
+# GitPython==1.0.2 raises "ValueError: I/O operation on closed file" when
+# trying to perform any actions on shallow repo. Version in git has the issue
+# fixed, but it was not released on PyPI yet.
+# TODO: Replace with "GitPython==1.0.3" when 1.0.3 released.
+git+https://github.com/gitpython-developers/GitPython.git@bfaf706d70c3c113b40ce1cbc4d11d73c7500d73#egg=git

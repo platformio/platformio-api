@@ -24,6 +24,7 @@ from tempfile import mkdtemp, mkstemp
 
 import requests
 from github import Github, GithubObject
+from git import Repo, GitCommandError
 
 from platformio_api import config
 from platformio_api.util import download_file, extract_archive
@@ -64,7 +65,7 @@ class BaseClient(object):
         """
         raise NotImplementedError()
 
-    def get_last_commit(self):
+    def get_last_commit(self, path=None):
         raise NotImplementedError()
 
     def get_type(self):
@@ -98,7 +99,50 @@ class BaseClient(object):
 class GitClient(BaseClient):
 
     def __init__(self, url, branch):
-        raise NotImplementedError()
+        super(GitClient, self).__init__(url, branch)
+        self.repo = None
+
+    def clone(self, destination_dir, revision=None):
+        repo = self._initialize_repo()
+        if revision:
+            if revision != self.branch and revision not in repo.tags:
+                try:
+                    repo.git.fetch('origin', 'tag', revision, depth=1)
+                except GitCommandError:
+                    pass
+            repo.git.checkout(revision)
+
+        if isdir(destination_dir):
+            rmtree(destination_dir)
+        copytree(repo.working_tree_dir, destination_dir)
+        rmtree(join(destination_dir, ".git"))
+
+    def get_last_commit(self, path=None):
+        if path:
+            raise NotImplementedError("`path` is not supported by GitClient")
+
+        repo = self._initialize_repo()
+        commit = repo.commit()
+        return dict(sha=commit.hexsha,
+                    date=datetime.fromtimestamp(commit.committed_date))
+
+    def _initialize_repo(self):
+        if not self.repo:
+            kwargs = {
+                'depth': 1,
+                'single-branch': True,
+            }
+            if self.branch:
+                kwargs['branch'] = self.branch
+            self.repo = Repo.clone_from(
+                self.url, mkdtemp(prefix='gitclient-repo-'), **kwargs
+            )
+
+        return self.repo
+
+    def __del__(self):
+        if self.repo and isdir(self.repo.working_tree_dir):
+            rmtree(self.repo.working_tree_dir)
 
 
 class HgClient(BaseClient):
