@@ -190,7 +190,8 @@ class LibSearchAPI(APIBase):
             "authors": [],
             "keywords": [],
             "frameworks": [],
-            "platforms": []
+            "platforms": [],
+            "name": [],
         }
         state = {key: None for key in params.keys()}
 
