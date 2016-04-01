@@ -99,7 +99,8 @@ class PackagesManifestAPI(APIBase):
             headers = {"User-Agent": "PlatformIO/%s %s" % (
                 __version__, requests.utils.default_user_agent())}
             r = requests.get(
-                "https://dl.bintray.com/platformio/dl-packages/manifest.json",
+                "https://dl.bintray.com/platformio/dl-packages/"
+                "manifest_old.json",
                 headers=headers, timeout=3)
             result = r.json()
             r.raise_for_status()
@@ -128,7 +129,8 @@ class PlatformsAPI(APIBase):
                 'url': p.get_vendor_url(),
                 'packages': p.get_packages().keys(),
                 'forDesktop': any([
-                    type_.startswith(n) for n in ("native", "linux", "windows")])
+                    type_.startswith(n)
+                    for n in ("native", "linux", "windows")])
             })
         return sorted(result, key=lambda item: item['type'])
 
