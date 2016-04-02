@@ -334,7 +334,7 @@ class LibSearchSolrAPI(LibSearchAPI):
         if self.perpage < 1 or self.perpage > self.ITEMS_PER_PAGE:
             self.perpage = self.ITEMS_PER_PAGE
 
-        if self.page < 1 or ((self.page - 1) * self.perpage) > self.total:
+        if self.page < 1:
             self.page = 1
 
     def get_result(self):
