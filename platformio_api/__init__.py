@@ -41,7 +41,7 @@ config = dict(
     SOLR_LIBS_URI=None,  # http://{host}:{port}/solr/{core}
 
     # Fuzzy search will not be applied to words shorter than the value below
-    SOLR_FUZZY_MIN_WORD_LENGTH=5,
+    SOLR_FUZZY_MIN_WORD_LENGTH=3,
     LOGGING=dict(version=1)
 )
 
