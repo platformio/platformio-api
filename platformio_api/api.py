@@ -326,9 +326,16 @@ class LibSearchSolrAPI(LibSearchAPI):
     ITEMS_PER_PAGE = 10
 
     def __init__(self, query=None, strict=False, page=1, perpage=None):
-        super(LibSearchSolrAPI, self).__init__(query, page, perpage)
-
+        self.search_query = self.parse_search_query(query)
         self.solr_query = self.prepare_solr_query(self.search_query, strict)
+        self.page = page
+        self.perpage = perpage or self.ITEMS_PER_PAGE
+
+        if self.perpage < 1 or self.perpage > self.ITEMS_PER_PAGE:
+            self.perpage = self.ITEMS_PER_PAGE
+
+        if self.page < 1 or ((self.page - 1) * self.perpage) > self.total:
+            self.page = 1
 
     def get_result(self):
         result = solr_libs.search(
