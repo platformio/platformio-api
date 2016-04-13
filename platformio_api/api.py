@@ -28,7 +28,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from platformio_api import __version__, config, models, util
 from platformio_api.database import Match, db_session
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
-from platformio_api.solr import solr_libs
+from platformio_api.solr import SolrClientFactory
 from platformio_api.util import parse_namedtitled_list
 
 
@@ -324,6 +324,7 @@ class LibSearchAPI(APIBase):
 class LibSearchSolrAPI(LibSearchAPI):
 
     ITEMS_PER_PAGE = 10
+    solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
 
     def __init__(self, query=None, strict=False, page=1, perpage=None):
         self.search_query = self.parse_search_query(query)
@@ -338,7 +339,7 @@ class LibSearchSolrAPI(LibSearchAPI):
             self.page = 1
 
     def get_result(self):
-        result = solr_libs.search(
+        result = self.solr_client.search(
             self.solr_query,
             params={
                 'start': (self.page - 1) * self.perpage,

@@ -25,6 +25,19 @@ from platformio_api import config
 logger = getLogger(__name__)
 
 
+class SolrClientFactory(object):
+    """Caches clients, so that queries to the same Solr instance will share
+    connections.
+    """
+    instances = {}
+
+    @classmethod
+    def newClient(cls, base_url):
+        if base_url not in cls.instances:
+            cls.instances[base_url] = SolrClient(base_url)
+        return cls.instances[base_url]
+
+
 class SolrClient(object):
     def __init__(self, base_url):
         self.base_url = base_url.rstrip('/') + '/'
@@ -52,31 +65,30 @@ class SolrClient(object):
                                  data=json.dumps(command))
 
 
-solr_libs = SolrClient(config["SOLR_LIBS_URI"])
-
-
 @event.listens_for(db_session, 'after_flush')
 def update_libs_on_solr(session, _):
+    solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
     docs_to_update = []
     for fts in session.dirty | session.new:
         if isinstance(fts, LibFTS):
             docs_to_update.append(fts_to_dict(fts))
     if docs_to_update:
-        solr_libs.update(docs_to_update)
+        solr_client.update(docs_to_update)
 
     doc_ids_to_delete = []
     for lib in session.deleted:
         if isinstance(lib, Libs):
             doc_ids_to_delete.append(str(lib.id))
     if doc_ids_to_delete:
-        solr_libs.update({"delete": {"id": " OR ".join(doc_ids_to_delete)}})
+        solr_client.update({"delete": {"id": " OR ".join(doc_ids_to_delete)}})
 
 
 def synchronize_libs_on_solr():
+    solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
     existing_lib_ids = [str(x) for x, in db_session.query(Libs.id).all()]
     if existing_lib_ids:
         # Delete all documents, except for those with specified ids
-        solr_libs.update({"delete": {
+        solr_client.update({"delete": {
             "query": "*:* -id:(%s)" % " OR ".join(existing_lib_ids)
         }})
     else:
@@ -86,6 +98,7 @@ def synchronize_libs_on_solr():
 
 
 def add_lib_fields():
+    solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
     commands = [
         {'add-field': {
             'name': 'name',
@@ -110,22 +123,24 @@ def add_lib_fields():
 
     for cmd in commands:
         logger.info('Added field. Response: %s'
-                    % (solr_libs.schema(cmd).json(),))
+                    % (solr_client.schema(cmd).json(),))
 
 
 def delete_lib_fields():
+    solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
     for field in ['keywords', 'examplefiles', 'authornames', 'frameworkslist',
                   'platformslist', 'name', 'description']:
-        logger.info('Deleted field. Response: %s' % (solr_libs.schema({
+        logger.info('Deleted field. Response: %s' % (solr_client.schema({
             'delete-field': {'name': field}
         }).json(),))
 
 
 def copy_fts_to_solr():
+    solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
     documents = []
     for lib_fts in db_session.query(LibFTS).order_by(LibFTS.lib_id).all():
         documents.append(fts_to_dict(lib_fts))
-    return solr_libs.update(documents)
+    return solr_client.update(documents)
 
 
 def fts_to_dict(instance):
