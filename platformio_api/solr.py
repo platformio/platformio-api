@@ -50,7 +50,7 @@ class SolrClient(object):
         payload = {
             'query': query,
         }
-        return self.session.post(self.base_url + 'query',
+        return self.session.post(self.base_url + 'search',
                                  params=params,
                                  data=json.dumps(payload))
 
