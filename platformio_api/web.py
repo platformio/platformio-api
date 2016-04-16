@@ -118,7 +118,8 @@ def lib_search():
     return finalize_json_response(api.LibSearchAPI, args)
 
 
-@app.route("/lib/search_v2")
+# Uncomment the line below in order to enable the Solr search
+# @app.route("/lib/search_v2")
 def lib_search_solr():
     strict = request.query.strict
     if strict.lower() in ['0', 'false', 'off']:
