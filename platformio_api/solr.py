@@ -65,7 +65,8 @@ class SolrClient(object):
                                  data=json.dumps(command))
 
 
-@event.listens_for(db_session, 'after_flush')
+# Uncomment the line below to enable synchronization between DB and Solr
+# @event.listens_for(db_session, 'after_flush')
 def update_libs_on_solr(session, _):
     solr_client = SolrClientFactory.newClient(config["SOLR_LIBS_URI"])
     docs_to_update = []
