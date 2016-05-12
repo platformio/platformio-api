@@ -27,7 +27,7 @@ from requests import get
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import models, util
-from platformio_api.cvsclient import CVSClientFactory
+from platformio_api.cvsclient import CVSClientFactory, MbedClient
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
@@ -314,6 +314,8 @@ class LibSyncer(object):
             elif self.cvsclient:
                 revisions_by_priority = ["v" + self.config["version"],
                                          self.config["version"]]
+                if isinstance(self.cvsclient, MbedClient):
+                    revisions_by_priority = revisions_by_priority[1:]
                 cloning_succeded = False
                 for revision in revisions_by_priority:
                     try:
