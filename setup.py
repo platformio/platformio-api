@@ -33,7 +33,8 @@ setup(
         "MySQL-python",
         "SQLAlchemy",
         "requests",
-        "PyGithub>=1.26,<2"
+        "PyGithub>=1.26,<2",
+        "GitPython"
     ],
     packages=find_packages(),
     entry_points={
