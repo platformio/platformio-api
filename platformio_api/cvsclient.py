@@ -176,7 +176,10 @@ class GithubClient(BaseClient):
                                        path=path)
 
             if commits:
-                commit = commits[0]
+                try:
+                    commit = commits[0]
+                except IndexError:
+                    pass
 
             if commit or not path or path == "/":
                 break
