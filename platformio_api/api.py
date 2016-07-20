@@ -193,7 +193,7 @@ class LibSearchAPI(APIBase):
             "keywords": [],
             "frameworks": [],
             "platforms": [],
-            "names": [],
+            "names": []
         }
         state = {key: None for key in params.keys()}
 
@@ -282,27 +282,27 @@ class LibSearchAPI(APIBase):
 
         # Relationship Way
         _params = self.search_query['params']
+        if _params.get("names"):
+            query = query.filter(models.LibFTS.name.in_(_params['names']))
         if _params.get("authors"):
             query = query.join(models.LibsAuthors).join(
                 models.Authors,
                 and_(models.Authors.name.in_(_params['authors']),
                      models.Authors.id == models.LibsAuthors.author_id)
             )
-
         if _params.get("keywords"):
             query = query.join(models.LibsKeywords).join(
                 models.Keywords,
                 and_(models.Keywords.name.in_(_params['keywords']),
                      models.Keywords.id == models.LibsKeywords.keyword_id)
             )
-
         if not count and (_params.get("authors") or _params.get("keywords")):
             query = query.group_by(models.LibFTS.lib_id)
 
         # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
         for key, items in (_params or {}).iteritems():
-            if not items or key in ("authors", "keywords"):
+            if not items or key in ("authors", "keywords", "names"):
                 continue
             _words.append('+("%s")' % '" "'.join(items))
 
