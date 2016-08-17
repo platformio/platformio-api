@@ -27,7 +27,7 @@ setup(
     url=__url__,
     license=__license__,
     install_requires=[
-        "platformio",
+        "platformio<3",
         "click<6",
         "bottle",
         "MySQL-python",
