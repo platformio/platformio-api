@@ -122,48 +122,6 @@ def get_libexample_url(lib_id, name):
                          name)
 
 
-def validate_libconf(data):
-    fields = set(data.keys())
-    if not fields.issuperset(set(["name", "keywords", "description"])):
-        raise InvalidLibConf(
-            "The 'name, keywords and description' fields are required")
-
-    if ("dependencies" in data and not
-            (isinstance(data['dependencies'], list) or
-             isinstance(data['dependencies'], dict))):
-        raise InvalidLibConf("The 'dependencies' field is invalid")
-
-    # if github- or mbed-based project
-    if "repository" in data:
-        type = data['repository'].get("type", None)
-        url = data['repository'].get("url", "")
-        if (type == "git" and "github.com" in url) \
-                or (type == "hg" and "developer.mbed.org" in url)  \
-                or (type in ["hg", "git"] and "bitbucket.org" in url):
-            return data
-
-    # if CVS-based
-    authors = data.get("authors", None)
-    if authors and not isinstance(authors, list):
-        authors = [authors]
-
-    if not authors:
-        raise InvalidLibConf("The 'authors' field is required")
-    elif not all(["name" in item for item in authors]):
-        raise InvalidLibConf("An each author should have 'name' property")
-    elif ("repository" in data and
-          data['repository'].get("type", None) in ("git", "svn")):
-        return data
-
-    # if self-hosted
-    if "version" not in data:
-        raise InvalidLibConf("The 'version' field is required")
-    elif "downloadUrl" not in data:
-        raise InvalidLibConf("The 'downloadUrl' field is required")
-
-    return data
-
-
 def get_c_sources(in_dir):
     return glob(join(in_dir, '*.c')) + glob(join(in_dir, '*.cpp')) \
         + glob(join(in_dir, '*.h'))

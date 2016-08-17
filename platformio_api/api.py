@@ -16,8 +16,8 @@ import json
 import logging
 import re
 from datetime import datetime
-from os.path import basename, join
 from itertools import chain
+from os.path import basename, join
 
 import requests
 from platformio.platforms.base import PlatformFactory, get_packages
@@ -25,12 +25,10 @@ from platformio.util import get_boards, get_frameworks
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
-from platformio_api import __version__, config, models, util
+from platformio_api import __version__, config, crawler, models, util
 from platformio_api.database import Match, db_session
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
 from platformio_api.solr import SolrClientFactory
-from platformio_api.util import parse_namedtitled_list
-
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +80,7 @@ class PackagesAPI(APIBase):
         for name, contents in get_packages().iteritems():
             result[name] = []
             for c in contents:
-                result[name].append({
-                    'name': c[0],
-                    'url': c[1]
-                })
+                result[name].append({'name': c[0], 'url': c[1]})
         return result
 
 
@@ -96,12 +91,12 @@ class PackagesManifestAPI(APIBase):
         r = None
 
         try:
-            headers = {"User-Agent": "PlatformIO/%s %s" % (
-                __version__, requests.utils.default_user_agent())}
-            r = requests.get(
-                "https://dl.bintray.com/platformio/dl-packages/"
-                "manifest_old.json",
-                headers=headers, timeout=3)
+            headers = {"User-Agent": "PlatformIO/%s %s" %
+                       (__version__, requests.utils.default_user_agent())}
+            r = requests.get("https://dl.bintray.com/platformio/dl-packages/"
+                             "manifest_old.json",
+                             headers=headers,
+                             timeout=3)
             result = r.json()
             r.raise_for_status()
         except:
@@ -129,8 +124,8 @@ class PlatformsAPI(APIBase):
                 'url': p.get_vendor_url(),
                 'packages': p.get_packages().keys(),
                 'forDesktop': any([
-                    type_.startswith(n)
-                    for n in ("native", "linux", "windows")])
+                    type_.startswith(n) for n in ("native", "linux", "windows")
+                ])
             })
         return sorted(result, key=lambda item: item['type'])
 
@@ -163,27 +158,26 @@ class LibSearchAPI(APIBase):
             (self.page - 1) * self.perpage)
 
         for data in query.all():
-            (lib_id, lib_name, lib_description, lib_keywords,
-             authornames, dlmonth, example_nums, updated,
-             frameworkslist, platformslist) = data
-            items.append(dict(
-                id=lib_id,
-                name=lib_name,
-                description=lib_description,
-                keywords=lib_keywords.split(","),
-                authornames=authornames.split(","),
-                frameworks=parse_namedtitled_list(frameworkslist),
-                platforms=parse_namedtitled_list(platformslist),
-                dlmonth=dlmonth,
-                examplenums=example_nums,
-                updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")
-            ))
+            (lib_id, lib_name, lib_description, lib_keywords, authornames,
+             dlmonth, example_nums, updated, frameworkslist,
+             platformslist) = data
+            items.append(
+                dict(
+                    id=lib_id,
+                    name=lib_name,
+                    description=lib_description,
+                    keywords=lib_keywords.split(","),
+                    authornames=authornames.split(","),
+                    frameworks=util.parse_namedtitled_list(frameworkslist),
+                    platforms=util.parse_namedtitled_list(platformslist),
+                    dlmonth=dlmonth,
+                    examplenums=example_nums,
+                    updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")))
         return dict(
             total=self.total,
             page=self.page,
             perpage=self.perpage,
-            items=items
-        )
+            items=items)
 
     def parse_search_query(self, query):
         quote = "\""
@@ -267,16 +261,14 @@ class LibSearchAPI(APIBase):
     def _prepare_sql_query(self, count=False):
         if count:
             query = db_session.query(
-                func.count(distinct(models.LibFTS.lib_id))
-            )
+                func.count(distinct(models.LibFTS.lib_id)))
         else:
             query = db_session.query(
                 models.LibFTS.lib_id, models.LibFTS.name,
                 models.LibFTS.description, models.LibFTS.keywords,
                 models.LibFTS.authornames, models.LibDLStats.month,
                 models.Libs.example_nums, models.Libs.updated,
-                models.LibFTS.frameworkslist, models.LibFTS.platformslist
-            )
+                models.LibFTS.frameworkslist, models.LibFTS.platformslist)
 
         query = query.join(models.Libs, models.LibDLStats)
 
@@ -285,17 +277,13 @@ class LibSearchAPI(APIBase):
         if _params.get("names"):
             query = query.filter(models.LibFTS.name.in_(_params['names']))
         if _params.get("authors"):
-            query = query.join(models.LibsAuthors).join(
-                models.Authors,
-                and_(models.Authors.name.in_(_params['authors']),
-                     models.Authors.id == models.LibsAuthors.author_id)
-            )
+            query = query.join(models.LibsAuthors).join(models.Authors, and_(
+                models.Authors.name.in_(_params['authors']),
+                models.Authors.id == models.LibsAuthors.author_id))
         if _params.get("keywords"):
-            query = query.join(models.LibsKeywords).join(
-                models.Keywords,
-                and_(models.Keywords.name.in_(_params['keywords']),
-                     models.Keywords.id == models.LibsKeywords.keyword_id)
-            )
+            query = query.join(models.LibsKeywords).join(models.Keywords, and_(
+                models.Keywords.name.in_(_params['keywords']),
+                models.Keywords.id == models.LibsKeywords.keyword_id))
         if not count and (_params.get("authors") or _params.get("keywords")):
             query = query.group_by(models.LibFTS.lib_id)
 
@@ -312,8 +300,7 @@ class LibSearchAPI(APIBase):
                 Match([models.LibFTS.name, models.LibFTS.description,
                        models.LibFTS.keywords, models.LibFTS.examplefiles,
                        models.LibFTS.authornames, models.LibFTS.frameworkslist,
-                       models.LibFTS.platformslist],
-                      fts_query))
+                       models.LibFTS.platformslist], fts_query))
         elif not count:
             query = query.order_by(models.LibDLStats.month.desc(),
                                    models.LibFTS.name)
@@ -344,8 +331,7 @@ class LibSearchSolrAPI(LibSearchAPI):
             params={
                 'start': (self.page - 1) * self.perpage,
                 'rows': self.perpage,
-            },
-        ).json()
+            }, ).json()
         _docs = result.get('response', {}).get('docs', [])
 
         ids = []
@@ -377,28 +363,28 @@ class LibSearchSolrAPI(LibSearchAPI):
                     "Lib #{} was in Solr response, but is not found in DB. "
                     "Consider running `platformio-api synchronize_libs_on_solr"
                     "` to remove any outdated libraries from index."
-                    .format(lib_id)
-                )
+                    .format(lib_id))
                 continue
-            items.append(dict(
-                id=lib.id,
-                name=lib.fts.name,
-                description=lib.fts.description,
-                keywords=lib.fts.keywords.split(","),
-                authornames=lib.fts.authornames.split(","),
-                frameworks=parse_namedtitled_list(lib.fts.frameworkslist),
-                platforms=parse_namedtitled_list(lib.fts.platformslist),
-                dlmonth=lib.dlstats.month,
-                examplenums=lib.example_nums,
-                updated=lib.updated.strftime("%Y-%m-%dT%H:%M:%SZ")
-            ))
+            items.append(
+                dict(
+                    id=lib.id,
+                    name=lib.fts.name,
+                    description=lib.fts.description,
+                    keywords=lib.fts.keywords.split(","),
+                    authornames=lib.fts.authornames.split(","),
+                    frameworks=util.parse_namedtitled_list(
+                        lib.fts.frameworkslist),
+                    platforms=util.parse_namedtitled_list(
+                        lib.fts.platformslist),
+                    dlmonth=lib.dlstats.month,
+                    examplenums=lib.example_nums,
+                    updated=lib.updated.strftime("%Y-%m-%dT%H:%M:%SZ")))
 
         return dict(
             total=result.get('response', {}).get('numFound', 0),
             page=self.page,
             perpage=self.perpage,
-            items=items,
-        )
+            items=items, )
 
     @staticmethod
     def prepare_solr_query(search_query, strict):
@@ -458,29 +444,27 @@ class LibExamplesAPI(LibSearchAPI):
             (self.page - 1) * self.perpage)
 
         for data in query.all():
-            (example, lib_name, lib_description, lib_keywords,
-             authornames, frameworkslist, platformslist) = data
+            (example, lib_name, lib_description, lib_keywords, authornames,
+             frameworkslist, platformslist) = data
             lib_id = example.lib_id
-            items.append(dict(
-                id=example.id,
-                name=example.name,
-                url=util.get_libexample_url(lib_id, example.name),
-                lib=dict(
-                    id=lib_id,
-                    name=lib_name,
-                    description=lib_description,
-                    keywords=lib_keywords.split(","),
-                    authornames=authornames.split(","),
-                    frameworks=parse_namedtitled_list(frameworkslist),
-                    platforms=parse_namedtitled_list(platformslist)
-                )
-            ))
+            items.append(
+                dict(
+                    id=example.id,
+                    name=example.name,
+                    url=util.get_libexample_url(lib_id, example.name),
+                    lib=dict(
+                        id=lib_id,
+                        name=lib_name,
+                        description=lib_description,
+                        keywords=lib_keywords.split(","),
+                        authornames=authornames.split(","),
+                        frameworks=util.parse_namedtitled_list(frameworkslist),
+                        platforms=util.parse_namedtitled_list(platformslist))))
         return dict(
             total=self.total,
             page=self.page,
             perpage=self.perpage,
-            items=items
-        )
+            items=items)
 
     def _prepare_sql_query(self, count=False):
         _params, _words = self.search_query
@@ -492,26 +476,21 @@ class LibExamplesAPI(LibSearchAPI):
                 models.LibExamples, models.LibFTS.name,
                 models.LibFTS.description, models.LibFTS.keywords,
                 models.LibFTS.authornames, models.LibFTS.frameworkslist,
-                models.LibFTS.platformslist
-            )
+                models.LibFTS.platformslist)
 
         query = query.join(models.Libs, models.LibFTS)
 
         # Relationship Way
         _params = self.search_query['params']
         if _params.get("authors"):
-            query = query.join(models.LibsAuthors).join(
-                models.Authors,
-                and_(models.Authors.name.in_(_params['authors']),
-                     models.Authors.id == models.LibsAuthors.author_id)
-            )
+            query = query.join(models.LibsAuthors).join(models.Authors, and_(
+                models.Authors.name.in_(_params['authors']),
+                models.Authors.id == models.LibsAuthors.author_id))
 
         if _params.get("keywords"):
-            query = query.join(models.LibsKeywords).join(
-                models.Keywords,
-                and_(models.Keywords.name.in_(_params['keywords']),
-                     models.Keywords.id == models.LibsKeywords.keyword_id)
-            )
+            query = query.join(models.LibsKeywords).join(models.Keywords, and_(
+                models.Keywords.name.in_(_params['keywords']),
+                models.Keywords.id == models.LibsKeywords.keyword_id))
 
         # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
@@ -526,8 +505,7 @@ class LibExamplesAPI(LibSearchAPI):
                 Match([models.LibFTS.name, models.LibFTS.description,
                        models.LibFTS.keywords, models.LibFTS.examplefiles,
                        models.LibFTS.authornames, models.LibFTS.frameworkslist,
-                       models.LibFTS.platformslist],
-                      fts_query))
+                       models.LibFTS.platformslist], fts_query))
         elif not count:
             query = query.order_by(models.LibExamples.id.desc())
 
@@ -546,15 +524,12 @@ class LibInfoAPI(APIBase):
             version=dict(),
             examples=[],
             frameworks={},
-            platforms={}
-        )
+            platforms={})
 
-        query = db_session.query(
-            models.Libs, models.LibVersions
-        ).join(
+        query = db_session.query(models.Libs, models.LibVersions).join(
             models.LibVersions,
-            models.LibVersions.id == models.Libs.latest_version_id
-        ).filter(models.Libs.id == self.id_)
+            models.LibVersions.id == models.Libs.latest_version_id).filter(
+                models.Libs.id == self.id_)
         try:
             lib, libversion = query.one()
         except NoResultFound:
@@ -579,8 +554,7 @@ class LibInfoAPI(APIBase):
         # latest version
         result['version'] = dict(
             name=libversion.name,
-            released=libversion.released.strftime("%Y-%m-%dT%H:%M:%SZ")
-        )
+            released=libversion.released.strftime("%Y-%m-%dT%H:%M:%SZ"))
 
         # authors
         for item in lib.authors:
@@ -604,8 +578,8 @@ class LibInfoAPI(APIBase):
 
         # home url
         if set(["url", "repository.url"]) & set(attributes.keys()):
-            result['url'] = attributes.get(
-                "url", attributes.get("repository.url"))
+            result['url'] = attributes.get("url",
+                                           attributes.get("repository.url"))
 
         return result
 
@@ -621,20 +595,18 @@ class LibDownloadAPI(APIBase):
     def get_result(self):
         if self.version:
             query = db_session.query(
-                models.Libs.id,
-                models.LibVersions.id, models.LibVersions.name
-            ).outerjoin(
-                models.LibVersions,
-                and_(models.LibVersions.lib_id == models.Libs.id,
-                     models.LibVersions.name == self.version)
-            ).filter(models.Libs.id == self.id_)
+                models.Libs.id, models.LibVersions.id,
+                models.LibVersions.name).outerjoin(models.LibVersions, and_(
+                    models.LibVersions.lib_id == models.Libs.id,
+                    models.LibVersions.name == self.version)).filter(
+                        models.Libs.id == self.id_)
         else:
-            query = db_session.query(
-                models.Libs.id, models.LibVersions.id, models.LibVersions.name
-            ).join(
-                models.LibVersions,
-                models.LibVersions.id == models.Libs.latest_version_id
-            ).filter(models.Libs.id == self.id_)
+            query = db_session.query(models.Libs.id, models.LibVersions.id,
+                                     models.LibVersions.name).join(
+                                         models.LibVersions,
+                                         models.LibVersions.id ==
+                                         models.Libs.latest_version_id).filter(
+                                             models.Libs.id == self.id_)
         try:
             data = query.one()
         except NoResultFound:
@@ -650,9 +622,7 @@ class LibDownloadAPI(APIBase):
         self._logdlinfo(lib_id)
 
         result = dict(
-            url=util.get_libarch_url(lib_id, version_id),
-            version=version_name
-        )
+            url=util.get_libarch_url(lib_id, version_id), version=version_name)
         return result
 
     def _logdlinfo(self, lib_id):
@@ -667,15 +637,33 @@ class LibDownloadAPI(APIBase):
             item.date = datetime.utcnow()
         except NoResultFound:
             db_session.query(models.LibDLStats).filter(
-                models.LibDLStats.lib_id == lib_id
-            ).update({
-                models.LibDLStats.day: models.LibDLStats.day + 1,
-                models.LibDLStats.week: models.LibDLStats.week + 1,
-                models.LibDLStats.month: models.LibDLStats.month + 1
-            })
+                models.LibDLStats.lib_id == lib_id).update({
+                    models.LibDLStats.day: models.LibDLStats.day + 1,
+                    models.LibDLStats.week: models.LibDLStats.week + 1,
+                    models.LibDLStats.month: models.LibDLStats.month + 1
+                })
             db_session.add(models.LibDLLog(lib_id=lib_id, ip=ip_int))
 
         db_session.commit()
+
+
+class LibVersionsAPI(APIBase):
+
+    def __init__(self, id_):
+        self.id_ = id_
+
+    def get_result(self):
+        result = []
+        query = db_session.query(models.LibVersions).filter(
+            models.LibVersions.lib_id == self.id_)
+        for version in query.all():
+            result.append(
+                dict(
+                    version=version.name,
+                    date=version.released.strftime("%Y-%m-%dT%H:%M:%SZ")))
+        if not result:
+            raise APINotFound("Unknown library with ID '%s'" % self.id_)
+        return result
 
 
 class LibVersionAPI(APIBase):
@@ -686,12 +674,9 @@ class LibVersionAPI(APIBase):
 
     def get_result(self):
         result = dict()
-        query = db_session.query(
-            models.Libs.id, models.LibVersions.name
-        ).join(
-            models.LibVersions,
-            models.LibVersions.id == models.Libs.latest_version_id
-        ).filter(models.Libs.id.in_(self.ids))
+        query = db_session.query(models.Libs.id, models.LibVersions.name).join(
+            models.LibVersions, models.LibVersions.id ==
+            models.Libs.latest_version_id).filter(models.Libs.id.in_(self.ids))
         result = {i[0]: i[1] for i in query.all()}
         for id_ in self.ids:
             if id_ not in result:
@@ -707,28 +692,19 @@ class LibRegisterAPI(APIBase):
             raise APIBadRequest("Please specify the library configuration URL")
 
     def get_result(self):
-        result = dict(
-            successed=False,
-            message=None
-        )
+        result = dict(successed=False, message=None)
 
-        config = dict()
         try:
-            r = requests.get(self.conf_url)
-            try:
-                config = r.json()
-            except ValueError:
-                raise InvalidLibConf(self.conf_url)
+            manifest_name = basename(self.conf_url)
+            if manifest_name == "library.properties":
+                cls = crawler.ArduinoLibSyncer
+            elif manifest_name == "module.json":
+                cls = crawler.MbedLibSyncer
+            else:
+                cls = crawler.PlatformIOLibSyncer
 
-            # validate fields
-            config = util.validate_libconf(config)
-
-            # check for name duplicates
-            # query = db_session.query(func.count(1)).filter(
-            #     models.LibFTS.name == config['name'])
-            # if query.scalar():
-            #     raise InvalidLibConf("The library with name '%s' is already "
-            #                          "registered" % config['name'])
+            config = cls.load_config(self.conf_url)
+            assert cls.validate_config(config)
 
             # check for pending duplicates
             query = db_session.query(func.count(1)).filter(
@@ -745,7 +721,7 @@ class LibRegisterAPI(APIBase):
             result['message'] = str(e)
         except Exception as e:
             logger.exception(e)
-            result['message'] = ("Could not retrieve a library JSON data by "
+            result['message'] = ("Could not retrieve a library data by "
                                  "this URL -> " + self.conf_url)
         return result
 
@@ -760,41 +736,40 @@ class LibStatsAPI(APIBase):
             topkeywords=self._get_top_keywords(),
             dlday=self._get_most_downloaded(models.LibDLStats.day),
             dlweek=self._get_most_downloaded(models.LibDLStats.week),
-            dlmonth=self._get_most_downloaded(models.LibDLStats.month)
-        )
+            dlmonth=self._get_most_downloaded(models.LibDLStats.month))
         return result
 
     def _get_last_updated(self, limit=5):
         items = []
         query = db_session.query(
-            models.Libs.id, models.Libs.updated, models.LibFTS.name
-        ).join(models.LibFTS).order_by(models.Libs.updated.desc()).limit(limit)
+            models.Libs.id, models.Libs.updated,
+            models.LibFTS.name).join(models.LibFTS).order_by(
+                models.Libs.updated.desc()).limit(limit)
         for item in query.all():
-            items.append(dict(
-                id=item[0],
-                name=item[2],
-                date=item[1].strftime("%Y-%m-%dT%H:%M:%SZ")
-            ))
+            items.append(
+                dict(
+                    id=item[0],
+                    name=item[2],
+                    date=item[1].strftime("%Y-%m-%dT%H:%M:%SZ")))
         return items
 
     def _get_last_added(self, limit=5):
         items = []
         query = db_session.query(
-            models.Libs.id, models.Libs.added, models.LibFTS.name
-        ).join(models.LibFTS).order_by(models.Libs.added.desc()).limit(limit)
+            models.Libs.id, models.Libs.added, models.LibFTS.name).join(
+                models.LibFTS).order_by(models.Libs.added.desc()).limit(limit)
         for item in query.all():
-            items.append(dict(
-                id=item[0],
-                name=item[2],
-                date=item[1].strftime("%Y-%m-%dT%H:%M:%SZ")
-            ))
+            items.append(
+                dict(
+                    id=item[0],
+                    name=item[2],
+                    date=item[1].strftime("%Y-%m-%dT%H:%M:%SZ")))
         return items
 
     def _get_last_keywords(self, limit=5):
         items = []
-        query = db_session.query(
-            models.Keywords.name
-        ).order_by(models.Keywords.id.desc()).limit(limit)
+        query = db_session.query(models.Keywords.name).order_by(
+            models.Keywords.id.desc()).limit(limit)
         for item in query.all():
             items.append(item[0])
         return items
@@ -802,10 +777,9 @@ class LibStatsAPI(APIBase):
     def _get_top_keywords(self, limit=50):
         items = []
         query = db_session.query(
-            models.Keywords.name, func.count(models.Keywords.id).label("total")
-        ).join(models.LibsKeywords).group_by(
-            models.Keywords.id
-        ).order_by("total DESC").limit(limit)
+            models.Keywords.name, func.count(models.Keywords.id).label(
+                "total")).join(models.LibsKeywords).group_by(
+                    models.Keywords.id).order_by("total DESC").limit(limit)
         for item in query.all():
             items.append(item[0])
         return items
@@ -813,14 +787,9 @@ class LibStatsAPI(APIBase):
     def _get_most_downloaded(self, period, limit=5):
         items = []
         query = db_session.query(
-            period, models.LibFTS.lib_id, models.LibFTS.name
-        ).join(
-            models.LibFTS, models.LibDLStats.lib_id == models.LibFTS.lib_id
-        ).order_by(period.desc()).limit(limit)
+            period, models.LibFTS.lib_id, models.LibFTS.name).join(
+                models.LibFTS, models.LibDLStats.lib_id ==
+                models.LibFTS.lib_id).order_by(period.desc()).limit(limit)
         for item in query.all():
-            items.append(dict(
-                id=item[1],
-                name=item[2],
-                total=item[0]
-            ))
+            items.append(dict(id=item[1], name=item[2], total=item[0]))
         return items

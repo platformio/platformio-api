@@ -51,6 +51,11 @@ def sync_lib(lib_id):
 
 
 @cli.command()
+def sync_arduino_libs():
+    maintenance.sync_arduino_libs()
+
+
+@cli.command()
 def rotatelibsdlstats():
     maintenance.rotate_libs_dlstats()
 

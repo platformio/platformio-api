@@ -15,6 +15,8 @@
 import json
 import logging
 import re
+import sys
+import textwrap
 from datetime import datetime
 from glob import glob
 from hashlib import sha1
@@ -22,69 +24,135 @@ from os import listdir, makedirs, remove
 from os.path import basename, dirname, exists, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
+from urlparse import urlparse
 
-from requests import get
+import requests
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import models, util
-from platformio_api.cvsclient import CVSClientFactory, MbedClient
+from platformio_api.vcsclient import VCSClientFactory, MbedVCSClient
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
-from platformio_api.util import get_c_sources, validate_libconf
-
+from platformio_api.util import get_c_sources
 
 logger = logging.getLogger(__name__)
 
 
-class LibSyncer(object):
+class LibSyncerFactory(object):
+
+    @staticmethod
+    def new(lib):
+        assert isinstance(lib, models.Libs)
+        clsname = "PlatformIOLibSyncer"
+        manifest_name = basename(lib.conf_url)
+        if manifest_name == "library.properties":
+            clsname = "ArduinoLibSyncer"
+        elif manifest_name == "module.json":
+            clsname = "MbedLibSyncer"
+        obj = getattr(sys.modules[__name__], clsname)(lib)
+        assert isinstance(obj, LibSyncerBase)
+        return obj
+
+
+class LibSyncerBase(object):
 
     def __init__(self, lib):
         assert isinstance(lib, models.Libs)
         self.lib = lib
 
         try:
-            self.config_origin = get(lib.conf_url).text
             self.config = self.clean_dict(
-                validate_libconf(json.loads(self.config_origin)))
+                self.validate_config(self.load_config(lib.conf_url)))
             logger.debug("LibConf: %s" % self.config)
-        except ValueError:
+        except Exception as e:
+            logger.error(e)
             raise InvalidLibConf(lib.conf_url)
 
-        self.cvsclient = None
+        self.vcsclient = None
         if "repository" in self.config:
             _type = self.config['repository'].get("type", "").lower()
             url = self.config['repository'].get("url", "")
             branch = self.config['repository'].get("branch", None)
             if _type and url:
-                self.cvsclient = CVSClientFactory.newClient(_type, url, branch)
+                self.vcsclient = VCSClientFactory.newClient(_type, url, branch)
 
-    def clean_dict(self, data):
-        for (key, _) in (data.iteritems() if isinstance(data, dict) else
-                         enumerate(data)):
+    @staticmethod
+    def clean_dict(data):
+        for (key, _) in (data.iteritems()
+                         if isinstance(data, dict) else enumerate(data)):
             if isinstance(data[key], dict) or isinstance(data[key], list):
-                data[key] = self.clean_dict(data[key])
+                data[key] = LibSyncerBase.clean_dict(data[key])
             elif isinstance(data[key], basestring):
                 data[key] = data[key].strip()
         return data
 
+    @staticmethod
+    def get_manifest_name():
+        raise NotImplementedError
+
+    @staticmethod
+    def load_config(manifest_url):
+        raise NotImplementedError
+
+    @staticmethod
+    def validate_config(config):
+        fields = set(config.keys())
+        if not fields.issuperset(set(["name", "keywords", "description"])):
+            raise InvalidLibConf(
+                "The 'name, keywords and description' fields are required")
+
+        if ("dependencies" in config and
+                not (isinstance(config['dependencies'], list) or
+                     isinstance(config['dependencies'], dict))):
+            raise InvalidLibConf("The 'dependencies' field is invalid")
+
+        # if github- or mbed-based project
+        if "repository" in config:
+            type = config['repository'].get("type", None)
+            url = config['repository'].get("url", "")
+            if (type == "git" and "github.com" in url) \
+                    or (type == "hg" and "developer.mbed.org" in url)  \
+                    or (type in ["hg", "git"] and "bitbucket.org" in url):
+                return config
+
+        # if CVS-based
+        authors = config.get("authors", None)
+        if authors and not isinstance(authors, list):
+            authors = [authors]
+
+        if not authors:
+            raise InvalidLibConf("The 'authors' field is required")
+        elif not all(["name" in item for item in authors]):
+            raise InvalidLibConf("An each author should have 'name' property")
+        elif ("repository" in config and
+              config['repository'].get("type", None) in ("git", "svn")):
+            return config
+
+        # if self-hosted
+        if "version" not in config:
+            raise InvalidLibConf("The 'version' field is required")
+        elif "downloadUrl" not in config:
+            raise InvalidLibConf("The 'downloadUrl' field is required")
+
+        return config
+
     def get_version(self):
         version = dict(
-            name=self.config.get("version", None),
-            released=datetime.utcnow()
-        )
+            name=self.config.get("version", None), released=datetime.utcnow())
 
-        if not version['name'] and self.cvsclient:
+        if self.vcsclient:
             path = None
             inclist = self.config.get("include", None)
             if isinstance(inclist, basestring):
                 path = inclist
-            commit = self.cvsclient.get_last_commit(path=path)
-            version['name'] = commit['sha'][:10]
+            commit = self.vcsclient.get_last_commit(path=path)
+            if not version['name']:
+                version['name'] = commit['sha'][:10]
             version['released'] = commit['date']
 
         if (version['name'] and
-                re.match(r"^[a-z0-9\.\-]+$", version['name'], re.I)):
+                re.match(r"^[a-z0-9\.\-\+]+$", version['name'], re.I)):
             return version
         else:
             raise InvalidLibVersion(version['name'])
@@ -112,8 +180,11 @@ class LibSyncer(object):
         if self.lib.fts is None:
             self.lib.fts = models.LibFTS(name=self.config['name'])
         self.lib.fts.name = self.config['name']
-        self.lib.fts.description = \
-            self.config.get("description", "")[:255] or None
+        if len(self.config['description']) > 255:
+            self.lib.fts.description = textwrap.wrap(
+                self.config['description'], 252)[0] + "..."
+        else:
+            self.lib.fts.description = self.config['description']
 
         self.config['authors'] = self.sync_authors(
             self.config.get("authors", None))
@@ -145,11 +216,7 @@ class LibSyncer(object):
 
     def sync_authors(self, confauthors):
         authors = []
-        itemtpl = dict(
-            email=None,
-            url=None,
-            maintainer=False
-        )
+        itemtpl = dict(email=None, url=None, maintainer=False)
         if confauthors:
             if not isinstance(confauthors, list):
                 confauthors = [confauthors]
@@ -157,9 +224,9 @@ class LibSyncer(object):
                 tmp = itemtpl.copy()
                 tmp.update(item)
                 authors.append(tmp)
-        elif self.cvsclient and self.cvsclient.get_type() == "github":
+        elif self.vcsclient and self.vcsclient.get_type() == "github":
             tmp = itemtpl.copy()
-            tmp.update(self.cvsclient.get_owner())
+            tmp.update(self.vcsclient.get_owner())
             authors.append(tmp)
         else:
             raise NotImplementedError()
@@ -187,10 +254,7 @@ class LibSyncer(object):
                     continue
                 _la = models.LibsAuthors(maintainer=item['maintainer'])
                 _la.author = models.Authors(
-                    name=item['name'],
-                    email=item['email'],
-                    url=item['url']
-                )
+                    name=item['name'], email=item['email'], url=item['url'])
                 self.lib.authors.append(_la)
 
         # save in string format for FTS
@@ -219,11 +283,18 @@ class LibSyncer(object):
 
     def _clean_keywords(self, keywords):
         result = []
-        keywords = (",".join(keywords) if isinstance(keywords, list) else
-                    keywords)
+        keywords = (",".join(keywords)
+                    if isinstance(keywords, list) else keywords)
         for item in keywords.split(","):
             item = item.strip().lower()
-            if len(item) and item not in result:
+            if not item or item in result:
+                continue
+            if len(item) >= 20:
+                for _item in item.split():
+                    _item = _item.strip()
+                    if _item not in result:
+                        result.append(_item)
+            else:
                 result.append(item)
         return result
 
@@ -277,22 +348,22 @@ class LibSyncer(object):
                 continue
             elif isinstance(v, list):
                 v = json.dumps(v)
-            confattrs[".".join(path + [k])] = v
+            if v:
+                confattrs[".".join(path + [k])] = v
 
     def _get_mbed_examples(self, urls, temporary_dir):
         actual_examples_dir = mkdtemp(dir=temporary_dir)
         files = []
         for url in urls:
-            client = CVSClientFactory.newClient("hg", url)
+            client = VCSClientFactory.newClient("hg", url)
             repo_name = client.url.split('/')[-2]
             repo_dir = mkdtemp(dir=temporary_dir)
             client.clone(repo_dir)
             for old_file_path in get_c_sources(repo_dir):
                 if isdir(old_file_path):
                     continue
-                new_file_path = join(
-                    actual_examples_dir,
-                    "%s_%s" % (repo_name, basename(old_file_path)))
+                new_file_path = join(actual_examples_dir, "%s_%s" %
+                                     (repo_name, basename(old_file_path)))
                 copy(old_file_path, new_file_path)
                 files.append(new_file_path)
         return files
@@ -305,16 +376,16 @@ class LibSyncer(object):
         try:
             if "downloadUrl" in self.config:
                 try:
-                    tmparh_path = mkstemp(basename(
-                        self.config['downloadUrl']))[1]
+                    tmparh_path = mkstemp(basename(self.config[
+                        'downloadUrl']))[1]
                     util.download_file(self.config['downloadUrl'], tmparh_path)
                     util.extract_archive(tmparh_path, srcdir)
                 finally:
                     remove(tmparh_path)
-            elif self.cvsclient:
+            elif self.vcsclient:
                 revisions_by_priority = ["v" + self.config["version"],
                                          self.config["version"]]
-                if isinstance(self.cvsclient, MbedClient):
+                if isinstance(self.vcsclient, MbedVCSClient):
                     revisions_by_priority = revisions_by_priority[1:]
                 cloning_succeded = False
                 for revision in revisions_by_priority:
@@ -324,14 +395,14 @@ class LibSyncer(object):
                         except OSError:
                             pass
                         srcdir = mkdtemp()
-                        self.cvsclient.clone(srcdir, revision)
+                        self.vcsclient.clone(srcdir, revision)
                         cloning_succeded = True
                         break
                     except:
                         continue
 
                 if not cloning_succeded:
-                    self.cvsclient.clone(srcdir)
+                    self.vcsclient.clone(srcdir)
             else:
                 raise LibArchiveError()
 
@@ -373,17 +444,16 @@ class LibSyncer(object):
                             else:
                                 copytree(itempath, dstpath, symlinks=True)
 
-            # put original library.json & modified .library.json
+            # put modified .library.json
             with open(join(archdir, ".library.json"), "w") as f:
                 json.dump(self.config, f, indent=4)
-            with open(join(archdir, "library.json"), "w") as f:
-                f.write(self.config_origin)
+            if not isfile(join(archdir, self.get_manifest_name())):
+                with open(join(archdir, self.get_manifest_name()), "w") as f:
+                    f.write(requests.get(self.lib.conf_url).text)
 
             # pack lib's files
-            archive_path = util.get_libarch_path(
-                self.lib.id,
-                self.lib.latest_version_id
-            )
+            archive_path = util.get_libarch_path(self.lib.id,
+                                                 self.lib.latest_version_id)
             if not isdir(dirname(archive_path)):
                 makedirs(dirname(archive_path))
             util.create_archive(archive_path, archdir)
@@ -405,8 +475,8 @@ class LibSyncer(object):
                 else:
                     for fmask in exmglobs:
                         exmfiles += glob(
-                            join(archdir if inclist is None else srcdir, fmask)
-                        )
+                            join(archdir
+                                 if inclist is None else srcdir, fmask))
             self.sync_examples(exmfiles)
         finally:
             for d in (archdir, srcdir, examples_dir):
@@ -436,3 +506,121 @@ class LibSyncer(object):
         self.lib.example_nums = len(usednames)
         usednames.sort(key=lambda v: v.upper())
         self.lib.fts.examplefiles = ",".join(usednames)
+
+
+class PlatformIOLibSyncer(LibSyncerBase):
+
+    @staticmethod
+    def get_manifest_name():
+        return "library.json"
+
+    @staticmethod
+    def load_config(manifest_url):
+        return requests.get(manifest_url).json()
+
+
+class ArduinoLibSyncer(LibSyncerBase):
+
+    @staticmethod
+    def get_manifest_name():
+        return "library.properties"
+
+    @staticmethod
+    def load_config(manifest_url):
+        manifest = {}
+        for line in requests.get(manifest_url).text.split("\n"):
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            manifest[key.strip()] = value.strip()
+        assert set(manifest.keys()) >= set(
+            ["name", "version", "author", "sentence", "category"])
+
+        #####
+        keywords = []
+        for keyword in re.split(r"[\s/]+", manifest['category']):
+            keyword = keyword.strip()
+            if not keyword:
+                continue
+            keywords.append(keyword.lower())
+
+        #####
+        description = manifest['sentence']
+        if manifest['sentence'] != manifest['paragraph']:
+            description = description.strip()
+            if not description.endswith("."):
+                description += "."
+            description += " " + manifest['paragraph']
+
+        #####
+        platforms = []
+        platforms_map = {
+            "avr": "atmelavr",
+            "sam": "atmelsam",
+            "samd": "atmelsam",
+            "esp8266": "espressif",
+        }
+        for arch in manifest.get("architectures", "").split(","):
+            arch = arch.strip()
+            if arch == "*":
+                platforms = "*"
+                break
+            if arch in platforms_map:
+                platforms.append(platforms_map[arch])
+
+        #####
+        authors = []
+        for author in manifest['author'].split(","):
+            name, email = ArduinoLibSyncer._parse_author(author)
+            authors.append(dict(name=name, email=email, maintainer=False))
+        for author in manifest['maintainer'].split(","):
+            name, email = ArduinoLibSyncer._parse_author(author)
+            exists = False
+            for item in authors:
+                if item['name'] != name:
+                    continue
+                exists = True
+                item['maintainer'] = True
+                if not item['email']:
+                    item['email'] = email
+            if not exists:
+                authors.append(dict(name=name, email=email, maintainer=True))
+
+        #####
+        repository = {"type": "git", "url": manifest['url']}
+        if "github.com" not in repository['url']:
+            assert "githubusercontent.com" in manifest_url
+            url = urlparse(manifest_url)
+            username, reponame, _ = url.path[1:].split("/", 2)
+            repository['url'] = "https://github.com/%s/%s" % (username,
+                                                              reponame)
+
+        config = {
+            "name": manifest['name'],
+            "version": manifest['version'],
+            "keywords": keywords,
+            "description": description,
+            "frameworks": "arduino",
+            "platforms": platforms,
+            "authors": authors,
+            "repository": repository,
+            "homepage": (manifest['url']
+                         if "github.com" not in manifest['url'] else None),
+            "exclude": [
+                "extras", "docs", "tests", "test"
+            ]
+        }
+        return config
+
+    @staticmethod
+    def _parse_author(author):
+        name = author
+        email = None
+        if all([s in author for s in ("<", ">")]):
+            name, email = author.split("<", 2)
+            email = email.replace(">", "")
+        return (name.strip(), email.strip() if email else None)
+
+
+class MbedLibSyncer(LibSyncerBase):
+    pass

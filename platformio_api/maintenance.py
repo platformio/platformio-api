@@ -17,12 +17,15 @@ from datetime import datetime, timedelta
 from math import ceil
 from os import remove
 from shutil import rmtree
+from urlparse import urlparse
 
+import requests
 from sqlalchemy import and_, func, select
 
 from platformio_api import models, util
-from platformio_api.crawler import LibSyncer
+from platformio_api.crawler import LibSyncerFactory
 from platformio_api.database import db_session
+from platformio_api.vcsclient import VCSClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +34,7 @@ def process_pending_libs():
 
     def get_free_lib_id():
         free_id = 0
-        query = db_session.query(models.Libs.id).order_by(
-            models.Libs.id.asc())
+        query = db_session.query(models.Libs.id).order_by(models.Libs.id.asc())
         for item in query.all():
             free_id += 1
             if item[0] > free_id:
@@ -48,13 +50,11 @@ def process_pending_libs():
         if lib_id:
             continue
         with util.rollback_on_exception(db_session, logger):
-            lib = models.Libs(
-                id=get_free_lib_id(),
-                conf_url=item.conf_url)
+            lib = models.Libs(id=get_free_lib_id(), conf_url=item.conf_url)
             lib.dlstats = models.LibDLStats(day=0, week=0, month=0)
             db_session.add(lib)
 
-            ls = LibSyncer(lib)
+            ls = LibSyncerFactory.new(lib)
             ls.sync()
 
             item.processed = True
@@ -77,7 +77,7 @@ def sync_libs():
 def sync_lib(item):
     sync_succeeded = False
     with util.rollback_on_exception(db_session, logger):
-        ls = LibSyncer(item)
+        ls = LibSyncerFactory.new(item)
         sync_succeeded = ls.sync()
         if sync_succeeded:
             item.synced = datetime.utcnow()
@@ -99,15 +99,18 @@ def rotate_libs_dlstats():
     db_session.query(models.LibDLLog.lib_id).filter(
         models.LibDLLog.date < datetime.utcnow() - timedelta(days=30)).delete()
 
-    db_session.query(models.LibDLStats).update(dict(
-        day=0,
-        week=select([func.count(1)]).where(and_(
-            models.LibDLLog.lib_id == models.LibDLStats.lib_id,
-            models.LibDLLog.date > datetime.utcnow() - timedelta(days=7)
-        )).as_scalar(),
-        month=select([func.count(1)]).where(
-            models.LibDLLog.lib_id == models.LibDLStats.lib_id).as_scalar()
-    ), synchronize_session=False)
+    db_session.query(models.LibDLStats).update(
+        dict(
+            day=0,
+            week=select([func.count(1)]).where(
+                and_(
+                    models.LibDLLog.lib_id == models.LibDLStats.lib_id,
+                    models.LibDLLog.date > datetime.utcnow() - timedelta(
+                        days=7))).as_scalar(),
+            month=select([func.count(1)]).where(
+                models.LibDLLog.lib_id ==
+                models.LibDLStats.lib_id).as_scalar()),
+        synchronize_session=False)
 
     db_session.commit()
 
@@ -169,3 +172,47 @@ def optimise_sync_period():
         lib.synced = new_sync_datetime
         new_sync_datetime += dt
     db_session.commit()
+
+
+def sync_arduino_libs():
+    used_urls = set()
+    query = db_session\
+        .query(models.LibsAttributes.value)\
+        .join(models.Attributes)\
+        .filter(models.Attributes.name == "repository.url")
+    for (url, ) in query.all():
+        if url.endswith(".git"):
+            used_urls.add(url[:-4])
+        else:
+            used_urls.add(url)
+
+    libs = requests.get(
+        "http://downloads.arduino.cc/libraries/library_index.json").json()
+    new_urls = set(l['website'] for l in libs['libraries'])
+    for url in new_urls:
+        for text in (".git", "/wiki", "/"):
+            if url.endswith(text):
+                url = url[:-len(text)]
+        if "github.com" not in url or url in used_urls:
+            continue
+        if url.count("/") != 4:
+            logging.warning("SyncArduinoLibs: Ignore " + url)
+            continue
+
+        vcs = VCSClientFactory.newClient("git", url)
+        urlp = urlparse(url)
+        manifest_url = (
+            "https://raw.githubusercontent.com{user_and_repo}/{branch}/"
+            "library.properties".format(
+                user_and_repo=urlp.path, branch=vcs.default_branch))
+
+        query = db_session.query(func.count(1)).filter(
+            models.PendingLibs.conf_url == manifest_url)
+        if query.scalar():
+            continue
+
+        db_session.add(
+            models.PendingLibs(
+                conf_url=manifest_url, approved=True))
+        db_session.commit()
+        logging.info("SyncArduinoLibs: Registered new library " + url)
