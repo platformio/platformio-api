@@ -22,7 +22,6 @@ from platformio_api import api, config
 from platformio_api.database import db_session
 from platformio_api.exception import APIBadRequest, APINotFound
 
-
 app = Bottle()
 logger = logging.getLogger(__name__)
 
@@ -58,10 +57,7 @@ def finalize_json_response(handler, kwargs):
         logger.exception(e)
 
     if error:
-        item = dict(
-            status=status,
-            title=str(error)
-        )
+        item = dict(status=status, title=str(error))
         result = dict(errors=[item])
 
     response.status = status
@@ -154,11 +150,16 @@ def lib_download(id_):
         id_=id_,
         ip=request.remote_addr,
         version=request.query.version,
-        ci="CI/1" in request.headers.get("User-Agent", "")
-    )
+        ci="CI/1" in request.headers.get("User-Agent", ""))
     return finalize_json_response(api.LibDownloadAPI, args)
 
 
+@app.route("/lib/versions/<id_:int>")
+def lib_versions(id_):
+    return finalize_json_response(api.LibVersionsAPI, dict(id_=id_))
+
+
+# PlatformIO 2.0
 @app.route("/lib/version/<ids:re:\d+(,\d+)*>")
 def lib_version(ids):
     ids = [int(i) for i in ids.split(",")[:50]]
