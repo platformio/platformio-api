@@ -516,7 +516,11 @@ class PlatformIOLibSyncer(LibSyncerBase):
 
     @staticmethod
     def load_config(manifest_url):
-        return requests.get(manifest_url).json()
+        manifest = requests.get(manifest_url).json()
+        if "url" in manifest:
+            manifest['homepage'] = manifest['url']
+            del manifest['url']
+        return manifest
 
 
 class ArduinoLibSyncer(LibSyncerBase):
