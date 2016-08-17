@@ -33,12 +33,15 @@ logger = logging.getLogger(__name__)
 def process_pending_libs():
 
     def get_free_lib_id():
+        lib_id = 0
         free_id = 0
         query = db_session.query(models.Libs.id).order_by(models.Libs.id.asc())
-        for item in query.all():
+        for (lib_id, ) in query.all():
             free_id += 1
-            if item[0] > free_id:
+            if lib_id > free_id:
                 break
+        if lib_id == free_id:
+            free_id += 1
         return free_id
 
     query = db_session.query(models.PendingLibs, models.Libs.id).filter(
@@ -175,44 +178,58 @@ def optimise_sync_period():
 
 
 def sync_arduino_libs():
+
+    def _cleanup_url(url):
+        for text in (".git", "/"):
+            if url.endswith(text):
+                url = url[:-len(text)]
+        return url
+
     used_urls = set()
     query = db_session\
         .query(models.LibsAttributes.value)\
         .join(models.Attributes)\
-        .filter(models.Attributes.name == "repository.url")
+        .filter(models.Attributes.name.in_(["homepage", "repository.url"]))
     for (url, ) in query.all():
-        if url.endswith(".git"):
-            used_urls.add(url[:-4])
-        else:
-            used_urls.add(url)
+        url = _cleanup_url(url)
+        used_urls.add(url)
 
     libs = requests.get(
         "http://downloads.arduino.cc/libraries/library_index.json").json()
-    new_urls = set(l['website'] for l in libs['libraries'])
+    new_urls = set(l['website'] for l in libs['libraries']
+                   if "Arduino" not in l.get("types", []))
     for url in new_urls:
-        for text in (".git", "/wiki", "/"):
-            if url.endswith(text):
-                url = url[:-len(text)]
-        if "github.com" not in url or url in used_urls:
-            continue
-        if url.count("/") != 4:
-            logging.warning("SyncArduinoLibs: Ignore " + url)
+        url = _cleanup_url(url)
+        if url in used_urls:
             continue
 
-        vcs = VCSClientFactory.newClient("git", url)
-        urlp = urlparse(url)
-        manifest_url = (
-            "https://raw.githubusercontent.com{user_and_repo}/{branch}/"
-            "library.properties".format(
-                user_and_repo=urlp.path, branch=vcs.default_branch))
+        logger.debug("SyncArduinoLibs: Processing " + url)
+
+        approved = False
+        if "github.com" not in url or url.count("/") != 4:
+            conf_url = url
+        else:
+            try:
+                vcs = VCSClientFactory.newClient("git", url)
+                default_branch = vcs.default_branch or "master"
+                conf_url = ("https://raw.githubusercontent.com{user_and_repo}/"
+                            "{branch}/library.properties".format(
+                                user_and_repo=urlparse(url).path,
+                                branch=default_branch))
+                r = requests.get(conf_url)
+                r.raise_for_status()
+                approved = True
+            except Exception:
+                # except github.GithubException.UnknownObjectException:
+                conf_url = url
 
         query = db_session.query(func.count(1)).filter(
-            models.PendingLibs.conf_url == manifest_url)
+            models.PendingLibs.conf_url == conf_url)
         if query.scalar():
             continue
 
         db_session.add(
             models.PendingLibs(
-                conf_url=manifest_url, approved=True))
+                conf_url=conf_url, approved=approved))
         db_session.commit()
-        logging.info("SyncArduinoLibs: Registered new library " + url)
+        logger.info("SyncArduinoLibs: Registered new library " + url)

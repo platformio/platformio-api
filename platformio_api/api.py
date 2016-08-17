@@ -697,7 +697,7 @@ class LibRegisterAPI(APIBase):
 
         try:
             manifest_name = basename(self.conf_url)
-            if manifest_name == "library.properties":
+            if manifest_name.endswith(".properties"):
                 cls = crawler.ArduinoLibSyncer
             elif manifest_name == "module.json":
                 cls = crawler.MbedLibSyncer

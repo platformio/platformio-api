@@ -46,7 +46,7 @@ class LibSyncerFactory(object):
         assert isinstance(lib, models.Libs)
         clsname = "PlatformIOLibSyncer"
         manifest_name = basename(lib.conf_url)
-        if manifest_name == "library.properties":
+        if manifest_name.endswith(".properties"):
             clsname = "ArduinoLibSyncer"
         elif manifest_name == "module.json":
             clsname = "MbedLibSyncer"
@@ -62,8 +62,9 @@ class LibSyncerBase(object):
         self.lib = lib
 
         try:
-            self.config = self.clean_dict(
-                self.validate_config(self.load_config(lib.conf_url)))
+            self.config = self.load_config(lib.conf_url)
+            self.config = self.validate_config(self.config)
+            self.config = self.clean_dict(self.config)
             logger.debug("LibConf: %s" % self.config)
         except Exception as e:
             logger.error(e)
@@ -465,6 +466,8 @@ class LibSyncerBase(object):
             if exmglobs is None:
                 for ext in ("*.ino", "*.pde", "*.c", "*.cpp", "*.h"):
                     exmfiles += glob(join(archdir, "[Ee]xamples", "*", ext))
+                    exmfiles += glob(
+                        join(archdir, "[Ee]xamples", "*", "*", ext))
             else:
                 if not isinstance(exmglobs, list):
                     exmglobs = [exmglobs]
@@ -538,23 +541,16 @@ class ArduinoLibSyncer(LibSyncerBase):
             key, value = line.split("=", 1)
             manifest[key.strip()] = value.strip()
         assert set(manifest.keys()) >= set(
-            ["name", "version", "author", "sentence", "category"])
+            ["name", "version", "author", "sentence"])
 
         #####
         keywords = []
-        for keyword in re.split(r"[\s/]+", manifest['category']):
+        for keyword in re.split(r"[\s/]+", manifest.get("category",
+                                                        "Uncategorized")):
             keyword = keyword.strip()
             if not keyword:
                 continue
             keywords.append(keyword.lower())
-
-        #####
-        description = manifest['sentence']
-        if manifest['sentence'] != manifest['paragraph']:
-            description = description.strip()
-            if not description.endswith("."):
-                description += "."
-            description += " " + manifest['paragraph']
 
         #####
         platforms = []
@@ -577,7 +573,7 @@ class ArduinoLibSyncer(LibSyncerBase):
         for author in manifest['author'].split(","):
             name, email = ArduinoLibSyncer._parse_author(author)
             authors.append(dict(name=name, email=email, maintainer=False))
-        for author in manifest['maintainer'].split(","):
+        for author in manifest.get("maintainer", "").split(","):
             name, email = ArduinoLibSyncer._parse_author(author)
             exists = False
             for item in authors:
@@ -591,25 +587,34 @@ class ArduinoLibSyncer(LibSyncerBase):
                 authors.append(dict(name=name, email=email, maintainer=True))
 
         #####
-        repository = {"type": "git", "url": manifest['url']}
-        if "github.com" not in repository['url']:
-            assert "githubusercontent.com" in manifest_url
-            url = urlparse(manifest_url)
-            username, reponame, _ = url.path[1:].split("/", 2)
-            repository['url'] = "https://github.com/%s/%s" % (username,
-                                                              reponame)
+        repository = {"type": "git", "url": None}
+        assert "githubusercontent.com" in manifest_url
+        username, reponame, _ = urlparse(manifest_url).path[1:].split("/", 2)
+        repository['url'] = "https://github.com/%s/%s" % (username, reponame)
+
+        #####
+        include = None
+        if "githubusercontent.com" in manifest_url:
+            path_parts = urlparse(manifest_url).path[1:].split("/")
+            if len(path_parts) > 4:
+                include = "/".join(path_parts[3:-1])
+
+        #####
+        homepage = None
+        if "url" in manifest and manifest['url'] != repository['url']:
+            homepage = manifest['url']
 
         config = {
             "name": manifest['name'],
             "version": manifest['version'],
             "keywords": keywords,
-            "description": description,
+            "description": manifest['sentence'],
             "frameworks": "arduino",
             "platforms": platforms,
             "authors": authors,
             "repository": repository,
-            "homepage": (manifest['url']
-                         if "github.com" not in manifest['url'] else None),
+            "homepage": homepage,
+            "include": include,
             "exclude": [
                 "extras", "docs", "tests", "test"
             ]
