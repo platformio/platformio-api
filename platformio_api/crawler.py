@@ -465,9 +465,10 @@ class LibSyncerBase(object):
             exmfiles = []
             if exmglobs is None:
                 for ext in ("*.ino", "*.pde", "*.c", "*.cpp", "*.h"):
-                    exmfiles += glob(join(archdir, "[Ee]xamples", "*", ext))
-                    exmfiles += glob(
-                        join(archdir, "[Ee]xamples", "*", "*", ext))
+                    _exmdir = join(archdir, "[Ee]xamples")
+                    exmfiles += glob(join(_exmdir, ext))
+                    exmfiles += glob(join(_exmdir, "*", ext))
+                    exmfiles += glob(join(_exmdir, "*", "*", ext))
             else:
                 if not isinstance(exmglobs, list):
                     exmglobs = [exmglobs]
