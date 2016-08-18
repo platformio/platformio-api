@@ -72,6 +72,12 @@ def deletelib(lib_id):
 
 
 @cli.command()
+@argument('version_id', type=int)
+def deletelibversion(version_id):
+    maintenance.delete_lib_version(version_id)
+
+
+@cli.command()
 @argument("keep_versions", type=int)
 def cleanuplibversions(keep_versions):
     maintenance.cleanup_lib_versions(keep_versions)

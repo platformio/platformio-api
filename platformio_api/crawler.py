@@ -448,9 +448,8 @@ class LibSyncerBase(object):
             # put modified .library.json
             with open(join(archdir, ".library.json"), "w") as f:
                 json.dump(self.config, f, indent=4)
-            if not isfile(join(archdir, self.get_manifest_name())):
-                with open(join(archdir, self.get_manifest_name()), "w") as f:
-                    f.write(requests.get(self.lib.conf_url).text)
+            with open(join(archdir, self.get_manifest_name()), "w") as f:
+                f.write(requests.get(self.lib.conf_url).text)
 
             # pack lib's files
             archive_path = util.get_libarch_path(self.lib.id,
@@ -573,12 +572,16 @@ class ArduinoLibSyncer(LibSyncerBase):
         authors = []
         for author in manifest['author'].split(","):
             name, email = ArduinoLibSyncer._parse_author(author)
+            if not name:
+                continue
             authors.append(dict(name=name, email=email, maintainer=False))
         for author in manifest.get("maintainer", "").split(","):
             name, email = ArduinoLibSyncer._parse_author(author)
+            if not name:
+                continue
             exists = False
             for item in authors:
-                if item['name'] != name:
+                if item['name'].lower() != name.lower():
                     continue
                 exists = True
                 item['maintainer'] = True
@@ -624,6 +627,8 @@ class ArduinoLibSyncer(LibSyncerBase):
 
     @staticmethod
     def _parse_author(author):
+        if author == "None":
+            return (None, None)
         name = author
         email = None
         if all([s in author for s in ("<", ">")]):

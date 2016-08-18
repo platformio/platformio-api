@@ -20,7 +20,9 @@ from shutil import rmtree
 from urlparse import urlparse
 
 import requests
+from pkg_resources import parse_version
 from sqlalchemy import and_, func, select
+from sqlalchemy.orm import lazyload
 
 from platformio_api import models, util
 from platformio_api.crawler import LibSyncerFactory
@@ -166,6 +168,27 @@ def cleanup_lib_versions(keep_versions):
 
 
 @util.rollback_on_exception_decorator(db_session, logger)
+def delete_lib_version(version_id):
+    query = db_session\
+        .query(models.LibVersions, models.Libs)\
+        .options(lazyload('*'))\
+        .join(models.Libs)\
+        .filter(models.LibVersions.id == version_id)
+    version, lib = query.one()
+    lib_id = lib.id
+    lib.latest_version_id = db_session\
+       .query(models.LibVersions.id)\
+       .with_parent(lib)\
+       .filter(models.LibVersions.id != version.id)\
+       .order_by(models.LibVersions.released.desc())\
+       .limit(1)\
+       .scalar()
+    db_session.delete(version)
+    db_session.commit()
+    remove_library_version_archive(lib_id, version_id)
+
+
+@util.rollback_on_exception_decorator(db_session, logger)
 def optimise_sync_period():
     libs = db_session.query(models.Libs)
     libs_count = libs.count()
@@ -194,12 +217,20 @@ def sync_arduino_libs():
         url = _cleanup_url(url)
         used_urls.add(url)
 
-    libs = requests.get(
+    libs_index = requests.get(
         "http://downloads.arduino.cc/libraries/library_index.json").json()
-    new_urls = set(l['website'] for l in libs['libraries']
-                   if "Arduino" not in l.get("types", []))
-    for url in new_urls:
-        url = _cleanup_url(url)
+    libs = {}
+    for lib in libs_index['libraries']:
+        if "Arduino" in lib.get("types", []):
+            continue
+        if lib['name'] not in libs or \
+           parse_version(lib['version']) > parse_version(
+               libs[lib['name']]['version']):
+            libs[lib['name']] = lib
+    del libs_index
+
+    for lib in libs.values():
+        url = _cleanup_url(lib['website'])
         if url in used_urls:
             continue
 
@@ -211,7 +242,8 @@ def sync_arduino_libs():
         else:
             try:
                 vcs = VCSClientFactory.newClient("git", url)
-                default_branch = vcs.default_branch or "master"
+                default_branch = vcs.default_branch
+                assert default_branch
                 conf_url = ("https://raw.githubusercontent.com{user_and_repo}/"
                             "{branch}/library.properties".format(
                                 user_and_repo=urlparse(url).path,
