@@ -73,7 +73,7 @@ class VCSBaseClient(object):
         raise NotImplementedError()
 
     def get_type(self):
-        return self.__class__.__name__.lower().replace("client", "")
+        return self.__class__.__name__.lower().replace("vcsclient", "")
 
     def _download_and_unpack_archive(self, url, destination_dir):
         arch_path = mkstemp(".tar.gz")[1]
