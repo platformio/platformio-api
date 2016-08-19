@@ -23,8 +23,7 @@ from subprocess import check_call
 import requests
 
 from platformio_api import __version__, config
-from platformio_api.exception import (DLFileError, DLFileSizeError,
-                                      InvalidLibConf)
+from platformio_api.exception import DLFileError, DLFileSizeError
 
 
 def ip2int(ip_string):

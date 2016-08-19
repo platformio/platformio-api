@@ -30,11 +30,11 @@ import requests
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import models, util
-from platformio_api.vcsclient import VCSClientFactory, MbedVCSClient
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       LibArchiveError)
 from platformio_api.util import get_c_sources
+from platformio_api.vcsclient import MbedVCSClient, VCSClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +303,8 @@ class LibSyncerBase(object):
         assert what in ("frameworks", "platforms")
         if not isinstance(items, list):
             items = [i.strip().lower() for i in items.split(",")]
+        else:
+            items = list(set(items))
 
         dbitems = []
         if items:
@@ -448,8 +450,8 @@ class LibSyncerBase(object):
             # put modified .library.json
             with open(join(archdir, ".library.json"), "w") as f:
                 json.dump(self.config, f, indent=4)
-            with open(join(archdir, self.get_manifest_name()), "w") as f:
-                f.write(requests.get(self.lib.conf_url).text)
+            util.download_file(self.lib.conf_url, join(
+                archdir, self.get_manifest_name()))
 
             # pack lib's files
             archive_path = util.get_libarch_path(self.lib.id,
@@ -519,7 +521,8 @@ class PlatformIOLibSyncer(LibSyncerBase):
 
     @staticmethod
     def load_config(manifest_url):
-        manifest = requests.get(manifest_url).json()
+        config_text = requests.get(manifest_url).text.encode("utf8")
+        manifest = json.loads(config_text)
         if "url" in manifest:
             manifest['homepage'] = manifest['url']
             del manifest['url']
@@ -535,7 +538,8 @@ class ArduinoLibSyncer(LibSyncerBase):
     @staticmethod
     def load_config(manifest_url):
         manifest = {}
-        for line in requests.get(manifest_url).text.split("\n"):
+        config_text = requests.get(manifest_url).text.encode("utf8")
+        for line in config_text.split("\n"):
             if "=" not in line:
                 continue
             key, value = line.split("=", 1)
@@ -631,9 +635,10 @@ class ArduinoLibSyncer(LibSyncerBase):
             return (None, None)
         name = author
         email = None
-        if all([s in author for s in ("<", ">")]):
-            name, email = author.split("<", 2)
-            email = email.replace(">", "")
+        for ldel, rdel in [("<", ">"), ("(", ")")]:
+            if ldel in author and rdel in author:
+                name, email = author.split(ldel, 2)
+                email = email.replace(rdel, "")
         return (name.strip(), email.strip() if email else None)
 
 

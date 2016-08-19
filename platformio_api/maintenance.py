@@ -221,8 +221,6 @@ def sync_arduino_libs():
         "http://downloads.arduino.cc/libraries/library_index.json").json()
     libs = {}
     for lib in libs_index['libraries']:
-        if "Arduino" in lib.get("types", []):
-            continue
         if lib['name'] not in libs or \
            parse_version(lib['version']) > parse_version(
                libs[lib['name']]['version']):
@@ -230,30 +228,37 @@ def sync_arduino_libs():
     del libs_index
 
     for lib in libs.values():
-        url = _cleanup_url(lib['website'])
-        if url in used_urls:
+        if _cleanup_url(lib['website']) in used_urls:
+            continue
+        github_url = "https://github.com/{}/{}"
+        if "github.com" in lib['website'] and lib['website'].count("/") >= 4:
+            github_url = github_url.format(
+                *urlparse(lib['website']).path[1:].split("/")[:2])
+        else:
+            _username, _filename = lib['url'].rsplit("/", 2)[1:]
+            github_url = github_url.format(_username,
+                                           _filename.rsplit("-", 1)[0])
+        github_url = _cleanup_url(github_url)
+        if github_url in used_urls:
             continue
 
-        logger.debug("SyncArduinoLibs: Processing " + url)
+        logger.debug("SyncArduinoLibs: Processing {name}, {website}".format(
+            **lib))
 
         approved = False
-        if "github.com" not in url or url.count("/") != 4:
-            conf_url = url
-        else:
-            try:
-                vcs = VCSClientFactory.newClient("git", url)
-                default_branch = vcs.default_branch
-                assert default_branch
-                conf_url = ("https://raw.githubusercontent.com{user_and_repo}/"
-                            "{branch}/library.properties".format(
-                                user_and_repo=urlparse(url).path,
-                                branch=default_branch))
-                r = requests.get(conf_url)
-                r.raise_for_status()
-                approved = True
-            except Exception:
-                # except github.GithubException.UnknownObjectException:
-                conf_url = url
+        try:
+            vcs = VCSClientFactory.newClient("git", github_url)
+            default_branch = vcs.default_branch
+            assert default_branch
+            conf_url = ("https://raw.githubusercontent.com{user_and_repo}/"
+                        "{branch}/library.properties".format(
+                            user_and_repo=urlparse(github_url).path,
+                            branch=default_branch))
+            r = requests.get(conf_url)
+            r.raise_for_status()
+            approved = True
+        except Exception:
+            conf_url = lib['website']
 
         query = db_session.query(func.count(1)).filter(
             models.PendingLibs.conf_url == conf_url)
@@ -264,4 +269,6 @@ def sync_arduino_libs():
             models.PendingLibs(
                 conf_url=conf_url, approved=approved))
         db_session.commit()
-        logger.info("SyncArduinoLibs: Registered new library " + url)
+        logger.info(
+            "SyncArduinoLibs: Registered new library {name}, {website}".format(
+                **lib))
