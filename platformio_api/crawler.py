@@ -27,6 +27,7 @@ from tempfile import mkdtemp, mkstemp
 from urlparse import urlparse
 
 import requests
+from sqlalchemy import and_
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import models, util
@@ -283,11 +284,13 @@ class LibSyncerBase(object):
         return keywords
 
     def _clean_keywords(self, keywords):
+        assert any([isinstance(keywords, t) for t in (list, basestring)])
+        if not isinstance(keywords, list):
+            keywords = [k for k in keywords.split(",")]
+        keywords = list(set([k.lower().strip() for k in keywords]))
+
         result = []
-        keywords = (",".join(keywords)
-                    if isinstance(keywords, list) else keywords)
-        for item in keywords.split(","):
-            item = item.strip().lower()
+        for item in keywords:
             if not item or item in result:
                 continue
             if len(item) >= 20:
@@ -300,17 +303,28 @@ class LibSyncerBase(object):
         return result
 
     def sync_frameworks_or_platforms(self, what, items):
+
+        def _process_items(items_):
+            if not isinstance(items_, list):
+                items_ = [i for i in items_.split(",")]
+            return list(set([i.lower().strip() for i in items_]))
+
         assert what in ("frameworks", "platforms")
-        if not isinstance(items, list):
-            items = [i.strip().lower() for i in items.split(",")]
-        else:
-            items = list(set(items))
+        assert any([isinstance(items, t) for t in (list, basestring)])
+        items = _process_items(items)
 
         dbitems = []
         if items:
             _model = getattr(models, what.title())
-            dbitems = db_session.query(_model)
+            dbitems = db_session.query(_model).order_by(_model.name.asc())
             if items[0] == "*":
+                if what == "platforms" and self.config.get("frameworks"):
+                    dbitems = dbitems.join(models.PlatformsFrameworks).join(
+                        models.Frameworks,
+                        and_(models.Frameworks.id ==
+                             models.PlatformsFrameworks.framework_id,
+                             models.Frameworks.name.in_(
+                                 _process_items(self.config['frameworks']))))
                 dbitems = dbitems.all()
                 items = [getattr(i, "name") for i in dbitems]
             else:
@@ -450,8 +464,8 @@ class LibSyncerBase(object):
             # put modified .library.json
             with open(join(archdir, ".library.json"), "w") as f:
                 json.dump(self.config, f, indent=4)
-            util.download_file(self.lib.conf_url, join(
-                archdir, self.get_manifest_name()))
+            util.download_file(self.lib.conf_url,
+                               join(archdir, self.get_manifest_name()))
 
             # pack lib's files
             archive_path = util.get_libarch_path(self.lib.id,
@@ -631,7 +645,7 @@ class ArduinoLibSyncer(LibSyncerBase):
 
     @staticmethod
     def _parse_author(author):
-        if author == "None":
+        if author == "None" or "://" in author:
             return (None, None)
         name = author
         email = None
