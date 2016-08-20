@@ -163,6 +163,10 @@ class LibSyncerBase(object):
         return sha1(str(sorted(self.config.items()))).hexdigest()
 
     def sync(self):
+        if "version" in self.config and \
+           self.lib.conf_sha1 == self.calc_config_sha1():
+            return True
+
         # fetch version info
         version = self.get_version()
         self.config['version'] = version['name']
