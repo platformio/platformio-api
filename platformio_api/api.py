@@ -656,7 +656,8 @@ class LibVersionsAPI(APIBase):
     def get_result(self):
         result = []
         query = db_session.query(models.LibVersions).filter(
-            models.LibVersions.lib_id == self.id_)
+            models.LibVersions.lib_id == self.id_).order_by(
+                models.LibVersions.released.asc(), models.LibVersions.id.asc())
         for version in query.all():
             result.append(
                 dict(
