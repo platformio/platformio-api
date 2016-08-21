@@ -21,7 +21,7 @@ from datetime import datetime
 from glob import glob
 from hashlib import sha1
 from os import listdir, makedirs, remove
-from os.path import basename, dirname, exists, isdir, isfile, join
+from os.path import basename, dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
 from urlparse import urlparse
@@ -33,7 +33,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from platformio_api import models, util
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
-                                      LibArchiveError)
+                                      PlatformioAPIException)
 from platformio_api.util import get_c_sources
 from platformio_api.vcsclient import MbedVCSClient, VCSClientFactory
 
@@ -204,8 +204,14 @@ class LibSyncerBase(object):
         # store library registry ID
         self.config['id'] = self.lib.id
 
-        # archive current library version
-        self.archive()
+        src_dir = mkdtemp()
+        try:
+            assert self.export(src_dir)
+            assert self.sync_examples(src_dir)
+            assert self.archive(src_dir)
+        finally:
+            if isdir(src_dir):
+                rmtree(src_dir)
 
         return self.config['id']
 
@@ -268,7 +274,7 @@ class LibSyncerBase(object):
         return authors
 
     def sync_keywords(self, keywords):
-        keywords = self._clean_keywords(keywords)
+        keywords = self._cleanup_keywords(keywords)
 
         # delete obsolete keywords
         self.lib.keywords = []
@@ -287,7 +293,7 @@ class LibSyncerBase(object):
         self.lib.fts.keywords = ",".join(keywords)
         return keywords
 
-    def _clean_keywords(self, keywords):
+    def _cleanup_keywords(self, keywords):
         assert any([isinstance(keywords, t) for t in (list, basestring)])
         if not isinstance(keywords, list):
             keywords = [k for k in keywords.split(",")]
@@ -372,13 +378,163 @@ class LibSyncerBase(object):
             if v:
                 confattrs[".".join(path + [k])] = v
 
-    def _get_mbed_examples(self, urls, temporary_dir):
-        actual_examples_dir = mkdtemp(dir=temporary_dir)
+    def export(self, src_dir):
+        if "downloadUrl" in self.config:
+            try:
+                tmparh_path = mkstemp(basename(self.config['downloadUrl']))[1]
+                util.download_file(self.config['downloadUrl'], tmparh_path)
+                util.extract_archive(tmparh_path, src_dir)
+            finally:
+                remove(tmparh_path)
+        elif self.vcsclient:
+            revisions_by_priority = ["v" + self.config["version"],
+                                     self.config["version"]]
+            if isinstance(self.vcsclient, MbedVCSClient):
+                revisions_by_priority = revisions_by_priority[1:]
+            cloning_succeded = False
+            for revision in revisions_by_priority:
+                try:
+                    # cleanup destination directory
+                    if isdir(src_dir):
+                        rmtree(src_dir)
+                        makedirs(src_dir)
+                    self.vcsclient.clone(src_dir, revision)
+                    cloning_succeded = True
+                    break
+                except:
+                    continue
+
+            if not cloning_succeded:
+                self.vcsclient.clone(src_dir)
+        else:
+            raise PlatformioAPIException()
+
+        return all([
+            self._export_exclude(src_dir), self._export_include(src_dir)
+        ])
+
+    def _export_exclude(self, src_dir):
+        exclist = self.config.get("export", {}).get("exclude", [])
+        if isinstance(exclist, basestring):
+            exclist = [exclist]
+        for pathname in exclist:
+            for item in glob(join(src_dir, pathname)):
+                if isfile(item):
+                    remove(item)
+                else:
+                    rmtree(item)
+        return True
+
+    def _export_include(self, src_dir):
+        inclist = self.config.get("export", {}).get("include", None)
+        if not inclist:
+            return True
+
+        tmp_dir = mkdtemp()
+        try:
+            if isinstance(inclist, list):
+                for pathname in inclist:
+                    for item in glob(join(src_dir, pathname)):
+                        dstpath = join(tmp_dir, item[len(src_dir) + 1:])
+                        if isfile(item):
+                            if not isdir(dirname(dstpath)):
+                                makedirs(dirname(dstpath))
+                            copy(item, dstpath)
+                        else:
+                            copytree(item, dstpath, symlinks=True)
+            # if "include" is a string then use it like a "mount" point
+            elif isinstance(inclist, basestring):
+                for item in glob(join(src_dir, inclist)):
+                    if isfile(item):
+                        copy(item, join(tmp_dir, basename(item)))
+                    else:
+                        for item2 in listdir(item):
+                            itempath = join(item, item2)
+                            dstpath = join(tmp_dir, item2)
+                            if isfile(itempath):
+                                copy(itempath, dstpath)
+                            else:
+                                copytree(itempath, dstpath, symlinks=True)
+
+            # replace src_dir with filtered content
+            rmtree(src_dir)
+            copytree(tmp_dir, src_dir, symlinks=True)
+        finally:
+            if isdir(tmp_dir):
+                rmtree(tmp_dir)
+        return True
+
+    def archive(self, src_dir):
+        # put modified .library.json
+        with open(join(src_dir, ".library.json"), "w") as f:
+            json.dump(self.config, f, indent=4)
+        util.download_file(self.lib.conf_url,
+                           join(src_dir, self.get_manifest_name()))
+
+        # pack lib's files
+        archive_path = util.get_libarch_path(self.lib.id,
+                                             self.lib.latest_version_id)
+        if not isdir(dirname(archive_path)):
+            makedirs(dirname(archive_path))
+        util.create_archive(archive_path, src_dir)
+        return isfile(archive_path)
+
+    def sync_examples(self, src_dir):
+        # clean previous examples
+        self.lib.examples = []
+        usednames = []
+
+        exmdir = util.get_libexample_dir(self.lib.id)
+        if isdir(exmdir):
+            rmtree(exmdir)
+
+        tmp_dir = mkdtemp()
+        try:
+            files = self.find_example_files(src_dir, tmp_dir)
+            if files:
+                makedirs(exmdir)
+            for f in files:
+                name = basename(f)
+                if name in usednames:
+                    continue
+                copy(f, join(exmdir, name))
+                self.lib.examples.append(models.LibExamples(name=name))
+                usednames.append(name)
+        finally:
+            rmtree(tmp_dir)
+
+        self.lib.example_nums = len(usednames)
+        usednames.sort(key=lambda v: v.upper())
+        self.lib.fts.examplefiles = ",".join(usednames)
+        return True
+
+    def find_example_files(self, src_dir, tmp_dir):
+        exmglobs = self.config.get("examples", None)
+        exmfiles = []
+        if exmglobs is None:
+            for ext in ("*.ino", "*.pde", "*.c", "*.cpp", "*.h"):
+                _exmdir = join(src_dir, "[Ee]xamples")
+                exmfiles += glob(join(_exmdir, ext))
+                exmfiles += glob(join(_exmdir, "*", ext))
+                exmfiles += glob(join(_exmdir, "*", "*", ext))
+        else:
+            if not isinstance(exmglobs, list):
+                exmglobs = [exmglobs]
+            repo_url = self.config.get('repository', {}).get("url", "")
+            if "developer.mbed.org" in repo_url:
+                exmfiles = self._fetch_mbed_example_files(exmglobs, tmp_dir)
+            else:
+                for fmask in exmglobs:
+                    exmfiles += glob(join(src_dir, fmask))
+        return exmfiles
+
+    def _fetch_mbed_example_files(self, urls, tmp_dir):
+        actual_examples_dir = mkdtemp(dir=tmp_dir)
         files = []
         for url in urls:
             client = VCSClientFactory.newClient("hg", url)
             repo_name = client.url.split('/')[-2]
-            repo_dir = mkdtemp(dir=temporary_dir)
+            repo_dir = mkdtemp(dir=tmp_dir)
             client.clone(repo_dir)
             for old_file_path in get_c_sources(repo_dir):
                 if isdir(old_file_path):
@@ -388,147 +544,6 @@ class LibSyncerBase(object):
                 copy(old_file_path, new_file_path)
                 files.append(new_file_path)
         return files
-
-    def archive(self):
-        archdir = mkdtemp()
-        srcdir = mkdtemp()
-        examples_dir = None
-
-        try:
-            if "downloadUrl" in self.config:
-                try:
-                    tmparh_path = mkstemp(basename(self.config[
-                        'downloadUrl']))[1]
-                    util.download_file(self.config['downloadUrl'], tmparh_path)
-                    util.extract_archive(tmparh_path, srcdir)
-                finally:
-                    remove(tmparh_path)
-            elif self.vcsclient:
-                revisions_by_priority = ["v" + self.config["version"],
-                                         self.config["version"]]
-                if isinstance(self.vcsclient, MbedVCSClient):
-                    revisions_by_priority = revisions_by_priority[1:]
-                cloning_succeded = False
-                for revision in revisions_by_priority:
-                    try:
-                        try:
-                            rmtree(srcdir)
-                        except OSError:
-                            pass
-                        srcdir = mkdtemp()
-                        self.vcsclient.clone(srcdir, revision)
-                        cloning_succeded = True
-                        break
-                    except:
-                        continue
-
-                if not cloning_succeded:
-                    self.vcsclient.clone(srcdir)
-            else:
-                raise LibArchiveError()
-
-            # delete excluded items
-            exclist = self.config.get("exclude", [])
-            if isinstance(exclist, basestring):
-                exclist = [exclist]
-            for pathname in exclist:
-                for item in glob(join(srcdir, pathname)):
-                    if isfile(item):
-                        remove(item)
-                    else:
-                        rmtree(item)
-
-            inclist = self.config.get("include", None)
-            if inclist is None:
-                archdir, srcdir = srcdir, archdir
-            elif isinstance(inclist, list):
-                for pathname in inclist:
-                    for item in glob(join(srcdir, pathname)):
-                        dstpath = join(archdir, item[len(srcdir) + 1:])
-                        if isfile(item):
-                            if not isdir(dirname(dstpath)):
-                                makedirs(dirname(dstpath))
-                            copy(item, dstpath)
-                        else:
-                            copytree(item, dstpath, symlinks=True)
-            # if "include" is a string then use it like a "mount" point
-            elif isinstance(inclist, basestring):
-                for item in glob(join(srcdir, inclist)):
-                    if isfile(item):
-                        copy(item, join(archdir, basename(item)))
-                    else:
-                        for item2 in listdir(item):
-                            itempath = join(item, item2)
-                            dstpath = join(archdir, item2)
-                            if isfile(itempath):
-                                copy(itempath, dstpath)
-                            else:
-                                copytree(itempath, dstpath, symlinks=True)
-
-            # put modified .library.json
-            with open(join(archdir, ".library.json"), "w") as f:
-                json.dump(self.config, f, indent=4)
-            util.download_file(self.lib.conf_url,
-                               join(archdir, self.get_manifest_name()))
-
-            # pack lib's files
-            archive_path = util.get_libarch_path(self.lib.id,
-                                                 self.lib.latest_version_id)
-            if not isdir(dirname(archive_path)):
-                makedirs(dirname(archive_path))
-            util.create_archive(archive_path, archdir)
-            assert isfile(archive_path)
-
-            # fetch examples
-            exmglobs = self.config.get("examples", None)
-            exmfiles = []
-            if exmglobs is None:
-                for ext in ("*.ino", "*.pde", "*.c", "*.cpp", "*.h"):
-                    _exmdir = join(archdir, "[Ee]xamples")
-                    exmfiles += glob(join(_exmdir, ext))
-                    exmfiles += glob(join(_exmdir, "*", ext))
-                    exmfiles += glob(join(_exmdir, "*", "*", ext))
-            else:
-                if not isinstance(exmglobs, list):
-                    exmglobs = [exmglobs]
-                repo_url = self.config.get('repository', {}).get("url", "")
-                if "developer.mbed.org" in repo_url:
-                    examples_dir = mkdtemp(prefix='pio_ex%s' % self.lib.id)
-                    exmfiles = self._get_mbed_examples(exmglobs, examples_dir)
-                else:
-                    for fmask in exmglobs:
-                        exmfiles += glob(
-                            join(archdir
-                                 if inclist is None else srcdir, fmask))
-            self.sync_examples(exmfiles)
-        finally:
-            for d in (archdir, srcdir, examples_dir):
-                if d and exists(d):
-                    rmtree(d)
-
-    def sync_examples(self, files):
-        # clean previous examples
-        self.lib.examples = []
-        usednames = []
-
-        exmdir = util.get_libexample_dir(self.lib.id)
-        if isdir(exmdir):
-            rmtree(exmdir)
-
-        if files:
-            makedirs(exmdir)
-
-        for f in files:
-            name = basename(f)
-            if name in usednames:
-                continue
-            copy(f, join(exmdir, name))
-            self.lib.examples.append(models.LibExamples(name=name))
-            usednames.append(name)
-
-        self.lib.example_nums = len(usednames)
-        usednames.sort(key=lambda v: v.upper())
-        self.lib.fts.examplefiles = ",".join(usednames)
 
 
 class PlatformIOLibSyncer(LibSyncerBase):
@@ -544,6 +559,14 @@ class PlatformIOLibSyncer(LibSyncerBase):
         if "url" in manifest:
             manifest['homepage'] = manifest['url']
             del manifest['url']
+        for key in ("include", "exclude"):
+            if key not in manifest:
+                continue
+            if "export" not in manifest:
+                manifest['export'] = {}
+            manifest['export'][key] = manifest[key]
+            del manifest[key]
+
         return manifest
 
 
@@ -601,15 +624,15 @@ class ArduinoLibSyncer(LibSyncerBase):
             name, email = ArduinoLibSyncer._parse_author(author)
             if not name:
                 continue
-            exists = False
+            found = False
             for item in authors:
                 if item['name'].lower() != name.lower():
                     continue
-                exists = True
+                found = True
                 item['maintainer'] = True
                 if not item['email']:
                     item['email'] = email
-            if not exists:
+            if not found:
                 authors.append(dict(name=name, email=email, maintainer=True))
 
         #####
@@ -640,10 +663,12 @@ class ArduinoLibSyncer(LibSyncerBase):
             "authors": authors,
             "repository": repository,
             "homepage": homepage,
-            "include": include,
-            "exclude": [
-                "extras", "docs", "tests", "test"
-            ]
+            "export": {
+                "include": include,
+                "exclude": [
+                    "extras", "docs", "tests", "test"
+                ]
+            }
         }
         return config
 

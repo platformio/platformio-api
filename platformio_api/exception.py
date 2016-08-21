@@ -34,11 +34,6 @@ class InvalidLibVersion(PlatformioAPIException):
     MESSAGE = "Invalid library version: %s"
 
 
-class LibArchiveError(PlatformioAPIException):
-
-    MESSAGE = "Can not archive a library"
-
-
 class DLFileError(PlatformioAPIException):
 
     MESSAGE = "Can not download a file: %s"
