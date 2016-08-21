@@ -50,7 +50,7 @@ class LibSyncerFactory(object):
         if manifest_name.endswith(".properties"):
             clsname = "ArduinoLibSyncer"
         elif manifest_name == "module.json":
-            clsname = "MbedLibSyncer"
+            clsname = "YottaLibSyncer"
         obj = getattr(sys.modules[__name__], clsname)(lib)
         assert isinstance(obj, LibSyncerBase)
         return obj
@@ -616,12 +616,12 @@ class ArduinoLibSyncer(LibSyncerBase):
         #####
         authors = []
         for author in manifest['author'].split(","):
-            name, email = ArduinoLibSyncer._parse_author(author)
+            name, email = ArduinoLibSyncer.parse_author_name_and_email(author)
             if not name:
                 continue
             authors.append(dict(name=name, email=email, maintainer=False))
         for author in manifest.get("maintainer", "").split(","):
-            name, email = ArduinoLibSyncer._parse_author(author)
+            name, email = ArduinoLibSyncer.parse_author_name_and_email(author)
             if not name:
                 continue
             found = False
@@ -673,7 +673,7 @@ class ArduinoLibSyncer(LibSyncerBase):
         return config
 
     @staticmethod
-    def _parse_author(author):
+    def parse_author_name_and_email(author):
         if author == "None" or "://" in author:
             return (None, None)
         name = author
@@ -685,5 +685,52 @@ class ArduinoLibSyncer(LibSyncerBase):
         return (name.strip(), email.strip() if email else None)
 
 
-class MbedLibSyncer(LibSyncerBase):
-    pass
+class YottaLibSyncer(LibSyncerBase):
+
+    @staticmethod
+    def get_manifest_name():
+        return "module.json"
+
+    @staticmethod
+    def load_config(manifest_url):
+        config_text = requests.get(manifest_url).text.encode("utf8")
+        manifest = json.loads(config_text)
+
+        #####
+        authors = []
+        for author in manifest['author'].split(","):
+            name, email = ArduinoLibSyncer.parse_author_name_and_email(author)
+            if not name:
+                continue
+            authors.append(dict(name=name, email=email, maintainer=False))
+
+        #####
+        repository = manifest.get("repository")
+        if not repository:
+            assert "githubusercontent.com" in manifest_url
+            username, reponame, _ = urlparse(manifest_url).path[1:].split("/",
+                                                                          2)
+            repository = {
+                "type": "git",
+                "url": "https://github.com/%s/%s" % (username, reponame)
+            }
+
+        config = {
+            "name": manifest['name'],
+            "version": manifest['version'],
+            "keywords": manifest['keywords'],
+            "description": manifest['description'],
+            "frameworks": "mbed",
+            "platforms": "*",
+            "authors": authors,
+            "repository": repository,
+            "homepage": manifest.get("homepage"),
+            "dependencies": manifest.get("dependencies"),
+            "license": manifest.get("license"),
+            "export": {
+                "exclude": [
+                    "tests", "test"
+                ]
+            }
+        }
+        return config
