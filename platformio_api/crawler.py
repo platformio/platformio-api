@@ -666,7 +666,7 @@ class ArduinoLibSyncer(LibSyncerBase):
             "export": {
                 "include": include,
                 "exclude": [
-                    "extras", "docs", "tests", "test"
+                    "extras", "docs", "tests", "test", "*.doxyfile", "*.pdf"
                 ]
             }
         }
@@ -729,7 +729,7 @@ class YottaLibSyncer(LibSyncerBase):
             "license": manifest.get("license"),
             "export": {
                 "exclude": [
-                    "tests", "test"
+                    "tests", "test", "*.doxyfile", "*.pdf"
                 ]
             }
         }
