@@ -16,7 +16,7 @@ from datetime import datetime
 
 from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, String, Text,
                         UniqueConstraint)
-from sqlalchemy.dialects.mysql import INTEGER, SMALLINT
+from sqlalchemy.dialects.mysql import INTEGER, SMALLINT, VARCHAR
 from sqlalchemy.orm import relationship
 
 from platformio_api.database import Base
@@ -43,7 +43,7 @@ class Authors(Base):
     __tablename__ = "authors"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(String(50), nullable=False, unique=True)
+    name = Column(VARCHAR(50, binary=True), nullable=False, unique=True)
     email = Column(String(50))
     url = Column(String(100))
 
