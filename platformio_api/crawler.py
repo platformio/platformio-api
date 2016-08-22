@@ -104,7 +104,7 @@ class LibSyncerBase(object):
             raise InvalidLibConf(
                 "The 'name, keywords and description' fields are required")
 
-        if ("dependencies" in config and
+        if (config.get("dependencies") and
                 not (isinstance(config['dependencies'], list) or
                      isinstance(config['dependencies'], dict))):
             raise InvalidLibConf("The 'dependencies' field is invalid")
@@ -698,7 +698,7 @@ class YottaLibSyncer(LibSyncerBase):
 
         #####
         authors = []
-        for author in manifest['author'].split(","):
+        for author in manifest.get("author", "").split(","):
             name, email = ArduinoLibSyncer.parse_author_name_and_email(author)
             if not name:
                 continue
@@ -706,7 +706,7 @@ class YottaLibSyncer(LibSyncerBase):
 
         #####
         repository = manifest.get("repository")
-        if not repository:
+        if not repository or repository.get("url", "").startswith("git@"):
             assert "githubusercontent.com" in manifest_url
             username, reponame, _ = urlparse(manifest_url).path[1:].split("/",
                                                                           2)
