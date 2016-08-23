@@ -576,11 +576,8 @@ class LibInfoAPI(APIBase):
         for item in lib.attributes:
             attributes[item.attribute.name] = item.value
 
-        # home url
-        if set(["homepage", "repository.url"]) & set(attributes.keys()):
-            result['homepage'] = attributes.get(
-                "homepage", attributes.get("repository.url"))
-            result['url'] = result['homepage']
+        result['homepage'] = attributes.get("homepage")
+        result['repository'] = attributes.get("repository.url")
 
         return result
 
