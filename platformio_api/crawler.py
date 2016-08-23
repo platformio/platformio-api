@@ -512,7 +512,7 @@ class LibSyncerBase(object):
         exmglobs = self.config.get("examples", None)
         exmfiles = []
         if exmglobs is None:
-            for ext in ("*.ino", "*.pde", "*.c", "*.cpp", "*.h"):
+            for ext in ("*.ino", "*.pde", "*.c", "*.cpp"):
                 _exmdir = join(src_dir, "[Ee]xamples")
                 exmfiles += glob(join(_exmdir, ext))
                 exmfiles += glob(join(_exmdir, "*", ext))
