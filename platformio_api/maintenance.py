@@ -265,6 +265,12 @@ def sync_arduino_libs():
         if query.scalar():
             continue
 
+        # leave for moderation library with existing name
+        if approved:
+            query = db_session.query(func.count(1)).filter(
+                models.LibFTS.name == lib['name'])
+            approved = not query.scalar()
+
         db_session.add(
             models.PendingLibs(
                 conf_url=conf_url, approved=approved))
