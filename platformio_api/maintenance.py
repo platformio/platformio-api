@@ -215,7 +215,7 @@ def sync_arduino_libs():
         .filter(models.Attributes.name.in_(["homepage", "repository.url"]))
     for (url, ) in query.all():
         url = _cleanup_url(url)
-        used_urls.add(url)
+        used_urls.add(url.lower())
 
     libs_index = requests.get(
         "http://downloads.arduino.cc/libraries/library_index.json").json()
@@ -228,7 +228,7 @@ def sync_arduino_libs():
     del libs_index
 
     for lib in libs.values():
-        if _cleanup_url(lib['website']) in used_urls:
+        if _cleanup_url(lib['website']).lower() in used_urls:
             continue
         github_url = "https://github.com/{}/{}"
         if "github.com" in lib['website'] and lib['website'].count("/") >= 4:
@@ -239,7 +239,7 @@ def sync_arduino_libs():
             github_url = github_url.format(_username,
                                            _filename.rsplit("-", 1)[0])
         github_url = _cleanup_url(github_url)
-        if github_url in used_urls:
+        if github_url.lower() in used_urls:
             continue
 
         logger.debug("SyncArduinoLibs: Processing {name}, {website}".format(
