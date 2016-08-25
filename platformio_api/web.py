@@ -39,7 +39,7 @@ def finalize_json_response(handler, kwargs):
                         "GET, POST, PUT, DELETE, OPTIONS")
     response.set_header("Access-Control-Allow-Headers",
                         "Content-Type, Access-Control-Allow-Headers")
-    response.set_header("content-type", "application/json")
+    response.set_header("content-type", "application/json; charset=utf-8")
 
     status = 200
     error = None

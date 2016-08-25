@@ -86,7 +86,7 @@ class LibSyncerBase(object):
             if isinstance(data[key], dict) or isinstance(data[key], list):
                 data[key] = LibSyncerBase.clean_dict(data[key])
             elif isinstance(data[key], basestring):
-                data[key] = data[key].strip()
+                data[key] = data[key].strip().decode("utf-8")
         return data
 
     @staticmethod
@@ -554,7 +554,7 @@ class PlatformIOLibSyncer(LibSyncerBase):
 
     @staticmethod
     def load_config(manifest_url):
-        config_text = requests.get(manifest_url).text.encode("utf8")
+        config_text = requests.get(manifest_url).text.encode("utf-8")
         manifest = json.loads(config_text)
         if "url" in manifest:
             manifest['homepage'] = manifest['url']
@@ -579,7 +579,7 @@ class ArduinoLibSyncer(LibSyncerBase):
     @staticmethod
     def load_config(manifest_url):
         manifest = {}
-        config_text = requests.get(manifest_url).text.encode("utf8")
+        config_text = requests.get(manifest_url).text.encode("utf-8")
         for line in config_text.split("\n"):
             if "=" not in line:
                 continue
@@ -694,7 +694,7 @@ class YottaLibSyncer(LibSyncerBase):
 
     @staticmethod
     def load_config(manifest_url):
-        config_text = requests.get(manifest_url).text.encode("utf8")
+        config_text = requests.get(manifest_url).text.encode("utf-8")
         manifest = json.loads(config_text)
 
         #####
