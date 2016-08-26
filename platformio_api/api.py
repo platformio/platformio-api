@@ -43,9 +43,12 @@ class BoardsAPI(APIBase):
 
     def get_result(self):
         items = []
-        for type_, data in get_boards().iteritems():
+        for id_, data in get_boards().iteritems():
+            if not isinstance(data, dict) or "name" not in data:
+                continue
             items.append({
-                "type": type_,
+                "type": id_,  # @TODO REMOVE
+                "id": id_,
                 "name": data['name'],
                 "mcu": data.get("build", {}).get("mcu", "").upper(),
                 "fcpu": int(data.get("build", {}).get("f_cpu", "")[:-1]),
@@ -65,8 +68,9 @@ class FrameworksAPI(APIBase):
         items = []
         for type_, data in get_frameworks().iteritems():
             items.append({
-                'type': type_,
-                'name': data['name'],
+                'type': type_,  # @TODO REMOVE
+                'name': type_,
+                'title': data['name'],
                 'description': data['description'],
                 'url': data['url']
             })
@@ -118,8 +122,9 @@ class PlatformsAPI(APIBase):
         for type_ in PlatformFactory.get_platforms().keys():
             p = PlatformFactory.newPlatform(type_)
             result.append({
-                'type': type_,
-                'name': p.get_name(),
+                'type': type_,  # @TODO REMOVE
+                'name': type_,
+                'title': p.get_name(),
                 'description': p.get_description(),
                 'url': p.get_vendor_url(),
                 'packages': p.get_packages().keys(),
@@ -127,7 +132,7 @@ class PlatformsAPI(APIBase):
                     type_.startswith(n) for n in ("native", "linux", "windows")
                 ])
             })
-        return sorted(result, key=lambda item: item['type'])
+        return sorted(result, key=lambda item: item['name'])
 
 
 class LibSearchAPI(APIBase):
