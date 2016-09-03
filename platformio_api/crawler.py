@@ -559,6 +559,7 @@ class PlatformIOLibSyncer(LibSyncerBase):
         if "url" in manifest:
             manifest['homepage'] = manifest['url']
             del manifest['url']
+
         for key in ("include", "exclude"):
             if key not in manifest:
                 continue
@@ -567,6 +568,15 @@ class PlatformIOLibSyncer(LibSyncerBase):
             manifest['export'][key] = manifest[key]
             del manifest[key]
 
+        # rename "espressif" platform
+        platforms = manifest.get("platforms")
+        if platforms and "espressif" in platforms:
+            if not isinstance(platforms, list):
+                platforms = [i for i in platforms.split(",")]
+            platforms = list(set([i.lower().strip() for i in platforms]))
+            if "espressif" in platforms:
+                platforms[platforms.index("espressif")] = "espressif8266"
+                manifest['platforms'] = platforms
         return manifest
 
 
@@ -603,7 +613,7 @@ class ArduinoLibSyncer(LibSyncerBase):
             "avr": "atmelavr",
             "sam": "atmelsam",
             "samd": "atmelsam",
-            "esp8266": "espressif",
+            "esp8266": "espressif8266",
             "arc32": "intel_arc32"
         }
         for arch in manifest.get("architectures", "").split(","):
