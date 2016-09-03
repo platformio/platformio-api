@@ -18,9 +18,9 @@ from logging import getLogger
 from requests import Session
 from sqlalchemy import event
 
+from platformio_api import config
 from platformio_api.database import db_session
 from platformio_api.models import LibFTS, Libs
-from platformio_api import config
 
 logger = getLogger(__name__)
 

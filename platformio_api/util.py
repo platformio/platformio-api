@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from contextlib import contextmanager
 from glob import glob
 from math import ceil
@@ -24,6 +25,11 @@ import requests
 
 from platformio_api import __version__, config
 from platformio_api.exception import DLFileError, DLFileSizeError
+
+
+def load_json(file_path):
+    with open(file_path, "r") as f:
+        return json.load(f)
 
 
 def ip2int(ip_string):

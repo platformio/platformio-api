@@ -23,8 +23,8 @@ from sys import modules
 from tempfile import mkdtemp, mkstemp
 
 import requests
+from git import GitCommandError, Repo
 from github import Github, GithubObject
-from git import Repo, GitCommandError
 
 from platformio_api import config
 from platformio_api.util import download_file, extract_archive

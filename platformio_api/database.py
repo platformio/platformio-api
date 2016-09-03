@@ -14,7 +14,7 @@
 
 import atexit
 
-from sqlalchemy import create_engine, DDL, event, literal
+from sqlalchemy import DDL, create_engine, event, literal
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker

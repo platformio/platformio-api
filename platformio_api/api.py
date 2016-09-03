@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import re
 from datetime import datetime
@@ -20,8 +19,6 @@ from itertools import chain
 from os.path import basename, join
 
 import requests
-from platformio.platforms.base import PlatformFactory, get_packages
-from platformio.util import get_boards, get_frameworks
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -42,50 +39,29 @@ class APIBase(object):
 class BoardsAPI(APIBase):
 
     def get_result(self):
-        items = []
-        for id_, data in get_boards().iteritems():
-            if not isinstance(data, dict) or "name" not in data:
-                continue
-            items.append({
-                "type": id_,  # @TODO REMOVE
-                "id": id_,
-                "name": data['name'],
-                "mcu": data.get("build", {}).get("mcu", "").upper(),
-                "fcpu": int(data.get("build", {}).get("f_cpu", "")[:-1]),
-                "ram": data.get("upload", {}).get("maximum_ram_size", 0),
-                "rom": data.get("upload", {}).get("maximum_size", 0),
-                "frameworks": data['frameworks'],
-                "platform": data['platform'],
-                "vendor": data['vendor'],
-                "url": data['url']
-            })
-        return items
+        return util.load_json(
+            join(config['DL_PIO_DIR'], "api-data", "boards.json"))
 
 
 class FrameworksAPI(APIBase):
 
     def get_result(self):
-        items = []
-        for type_, data in get_frameworks().iteritems():
-            items.append({
-                'type': type_,  # @TODO REMOVE
-                'name': type_,
-                'title': data['name'],
-                'description': data['description'],
-                'url': data['url']
-            })
-        return items
+        return util.load_json(
+            join(config['DL_PIO_DIR'], "api-data", "frameworks.json"))
 
 
 class PackagesAPI(APIBase):
 
     def get_result(self):
-        result = {}
-        for name, contents in get_packages().iteritems():
-            result[name] = []
-            for c in contents:
-                result[name].append({'name': c[0], 'url': c[1]})
-        return result
+        return util.load_json(
+            join(config['DL_PIO_DIR'], "api-data", "packages.json"))
+
+
+class PlatformsAPI(APIBase):
+
+    def get_result(self):
+        return util.load_json(
+            join(config['DL_PIO_DIR'], "api-data", "platforms.json"))
 
 
 class PackagesManifestAPI(APIBase):
@@ -104,8 +80,8 @@ class PackagesManifestAPI(APIBase):
             result = r.json()
             r.raise_for_status()
         except:
-            with open(join(util.get_packages_dir(), "manifest.json")) as f:
-                result = json.load(f)
+            result = util.load_json(
+                join(util.get_packages_dir(), "manifest.json"))
             for name, versions in result.iteritems():
                 for item in versions:
                     item['url'] = util.get_package_url(basename(item['url']))
@@ -113,26 +89,6 @@ class PackagesManifestAPI(APIBase):
             if r:
                 r.close()
         return result
-
-
-class PlatformsAPI(APIBase):
-
-    def get_result(self):
-        result = []
-        for type_ in PlatformFactory.get_platforms().keys():
-            p = PlatformFactory.newPlatform(type_)
-            result.append({
-                'type': type_,  # @TODO REMOVE
-                'name': type_,
-                'title': p.get_name(),
-                'description': p.get_description(),
-                'url': p.get_vendor_url(),
-                'packages': p.get_packages().keys(),
-                'forDesktop': any([
-                    type_.startswith(n) for n in ("native", "linux", "windows")
-                ])
-            })
-        return sorted(result, key=lambda item: item['name'])
 
 
 class LibSearchAPI(APIBase):
