@@ -88,10 +88,7 @@ def frameworks():
 
 @app.route("/packages")
 def packages():
-    if "PlatformIO/" in request.headers.get("User-Agent", ""):
-        return finalize_json_response(api.PackagesManifestAPI, {})
-    else:
-        return finalize_json_response(api.PackagesAPI, {})
+    return finalize_json_response(api.PackagesAPI, {})
 
 
 @app.route("/packages/manifest")
