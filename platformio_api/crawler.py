@@ -489,7 +489,7 @@ class LibSyncerBase(object):
                     usednames[_name] = name
 
         newitems = []
-        for name in sorted(usednames.values(), key=str.lower):
+        for name in sorted(usednames.values(), key=lambda s: s.lower()):
             found = False
             for header in self.lib.headers:
                 if header.name == name:
@@ -525,7 +525,7 @@ class LibSyncerBase(object):
             rmtree(tmp_dir)
 
         newitems = []
-        for name in sorted(usednames.values(), key=str.lower):
+        for name in sorted(usednames.values(), key=lambda s: s.lower()):
             found = False
             for example in self.lib.examples:
                 if example.name == name:
