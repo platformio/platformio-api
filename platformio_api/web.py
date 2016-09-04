@@ -111,21 +111,6 @@ def lib_search():
     return finalize_json_response(api.LibSearchAPI, args)
 
 
-# Uncomment the line below in order to enable the Solr search
-# @app.route("/lib/search_v2")
-def lib_search_solr():
-    strict = request.query.strict
-    if strict.lower() in ['0', 'false', 'off']:
-        strict = False
-    args = dict(
-        query=unquote(request.query.query[:255]),
-        page=int(request.query.page) if request.query.page else 0,
-        strict=bool(strict),
-        # perpage=int(request.query.perpage) if request.query.perpage else 0
-    )
-    return finalize_json_response(api.LibSearchSolrAPI, args)
-
-
 @app.route("/lib/examples")
 def lib_examples():
     args = dict(

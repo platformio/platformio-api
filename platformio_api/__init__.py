@@ -38,7 +38,6 @@ config = dict(
     DL_PIO_DIR=None,
     DL_PIO_URL=None,
     MAX_DLFILE_SIZE=1024 * 1024 * 50,  # 50 Mb
-    SOLR_LIBS_URI=None,  # http://{host}:{port}/solr/{core}
 
     # Fuzzy search will not be applied to words shorter than the value below
     SOLR_FUZZY_MIN_WORD_LENGTH=3,

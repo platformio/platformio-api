@@ -17,7 +17,7 @@ from sys import exit as sys_exit
 import requests
 from click import argument, echo, group, version_option
 
-from platformio_api import __version__, maintenance, solr
+from platformio_api import __version__, maintenance
 from platformio_api.database import sync_db
 from platformio_api.web import app
 
@@ -87,18 +87,6 @@ def cleanuplibversions(keep_versions):
 @cli.command()
 def optimisesyncperiod():
     maintenance.optimise_sync_period()
-
-
-@cli.command()
-def initialize_solr_for_libs():
-    solr.delete_lib_fields()
-    solr.add_lib_fields()
-    solr.copy_fts_to_solr()
-
-
-@cli.command()
-def synchronize_libs_on_solr():
-    solr.synchronize_libs_on_solr()
 
 
 def main():
