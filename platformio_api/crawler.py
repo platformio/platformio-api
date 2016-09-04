@@ -20,7 +20,7 @@ import textwrap
 from datetime import datetime
 from glob import glob
 from hashlib import sha1
-from os import listdir, makedirs, remove
+from os import listdir, makedirs, remove, walk
 from os.path import basename, dirname, isdir, isfile, join
 from shutil import copy, copytree, rmtree
 from tempfile import mkdtemp, mkstemp
@@ -207,6 +207,7 @@ class LibSyncerBase(object):
         src_dir = mkdtemp()
         try:
             assert self.export(src_dir)
+            assert self.sync_headers(src_dir)
             assert self.sync_examples(src_dir)
             assert self.archive(src_dir)
         finally:
@@ -479,15 +480,35 @@ class LibSyncerBase(object):
         util.create_archive(archive_path, src_dir)
         return isfile(archive_path)
 
-    def sync_examples(self, src_dir):
-        # clean previous examples
-        self.lib.examples = []
-        usednames = []
+    def sync_headers(self, src_dir):
+        usednames = {}
+        for _, _, files in walk(src_dir):
+            for name in files:
+                _name = name.lower()
+                if _name.endswith((".h", ".hpp")) and _name not in usednames:
+                    usednames[_name] = name
 
+        newitems = []
+        for name in sorted(usednames.values(), key=str.lower):
+            found = False
+            for header in self.lib.headers:
+                if header.name == name:
+                    newitems.append(header)
+                    found = True
+                    break
+            if not found:
+                newitems.append(models.LibHeaders(name=name))
+
+        self.lib.headers = newitems
+        self.lib.fts.headerslist = ",".join(usednames.values())
+        return True
+
+    def sync_examples(self, src_dir):
         exmdir = util.get_libexample_dir(self.lib.id)
         if isdir(exmdir):
             rmtree(exmdir)
 
+        usednames = {}
         tmp_dir = mkdtemp()
         try:
             files = self.find_example_files(src_dir, tmp_dir)
@@ -495,17 +516,27 @@ class LibSyncerBase(object):
                 makedirs(exmdir)
             for f in files:
                 name = basename(f)
-                if name in usednames:
+                _name = name.lower()
+                if _name in usednames:
                     continue
                 copy(f, join(exmdir, name))
-                self.lib.examples.append(models.LibExamples(name=name))
-                usednames.append(name)
+                usednames[_name] = name
         finally:
             rmtree(tmp_dir)
 
+        newitems = []
+        for name in sorted(usednames.values(), key=str.lower):
+            found = False
+            for example in self.lib.examples:
+                if example.name == name:
+                    newitems.append(example)
+                    found = True
+                    break
+            if not found:
+                newitems.append(models.LibExamples(name=name))
+
+        self.lib.examples = newitems
         self.lib.example_nums = len(usednames)
-        usednames.sort(key=lambda v: v.upper())
-        self.lib.fts.examplefiles = ",".join(usednames)
         return True
 
     def find_example_files(self, src_dir, tmp_dir):

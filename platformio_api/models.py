@@ -101,11 +101,11 @@ class Libs(Base):
     attributes = relationship("LibsAttributes", cascade="all,delete-orphan")
     authors = relationship("LibsAuthors", cascade="all,delete-orphan")
     examples = relationship("LibExamples", cascade="all,delete-orphan")
+    headers = relationship("LibHeaders", cascade="all,delete-orphan")
     frameworks = relationship(
         "Frameworks",
         secondary="libs_frameworks",
-        cascade="save-update, merge, refresh-expire, "
-        "expunge")
+        cascade="save-update, merge, refresh-expire, expunge")
     fts = relationship(
         "LibFTS", uselist=False, lazy="joined", innerjoin=True, cascade="all")
     dllog = relationship("LibDLLog", cascade="all")
@@ -187,6 +187,15 @@ class LibExamples(Base):
     name = Column(String(100))
 
 
+class LibHeaders(Base):
+    __tablename__ = "lib_headers"
+
+    id = Column(INTEGER(unsigned=True), primary_key=True)
+    lib_id = Column(
+        INTEGER(unsigned=True), ForeignKey("libs.id"), nullable=False)
+    name = Column(String(50))
+
+
 class LibFTS(Base):
     __tablename__ = "lib_fts"
 
@@ -195,7 +204,7 @@ class LibFTS(Base):
     name = Column(String(50), nullable=False)
     description = Column(String(255), nullable=False)
     keywords = Column(String(255), nullable=False)
-    examplefiles = Column(Text(), nullable=False)
+    headerslist = Column(Text(), nullable=False)
     authornames = Column(String(255), nullable=False)
     frameworkslist = Column(String(255), nullable=False)
     platformslist = Column(Text(), nullable=False)

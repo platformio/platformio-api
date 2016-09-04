@@ -111,7 +111,7 @@ class LibSearchAPI(APIBase):
             self.page = 1
 
     def get_total(self):
-        return self._prepare_sql_query(count=True).scalar()
+        return self._prepare_sql_query(is_count=True).scalar()
 
     def get_result(self):
         items = []
@@ -148,7 +148,8 @@ class LibSearchAPI(APIBase):
             "keywords": [],
             "frameworks": [],
             "platforms": [],
-            "names": []
+            "names": [],
+            "headers": []
         }
         state = {key: None for key in params.keys()}
 
@@ -219,8 +220,8 @@ class LibSearchAPI(APIBase):
         return re.sub(r"(([\+\-\~\<\>]([^\w\(\"]|$))|(\*{2,}))", r'"\1"',
                       query)
 
-    def _prepare_sql_query(self, count=False):
-        if count:
+    def _prepare_sql_query(self, is_count=False):
+        if is_count:
             query = db_session.query(
                 func.count(distinct(models.LibFTS.lib_id)))
         else:
@@ -232,7 +233,14 @@ class LibSearchAPI(APIBase):
                 models.LibFTS.frameworkslist, models.LibFTS.platformslist)
 
         query = query.join(models.Libs, models.LibDLStats)
+        query = self._apply_filters_to_query(query, is_count)
 
+        if not self.search_query['words'] and not is_count:
+            query = query.order_by(models.LibDLStats.month.desc(),
+                                   models.LibFTS.name)
+        return query
+
+    def _apply_filters_to_query(self, query, is_count=False):
         # Relationship Way
         _params = self.search_query['params']
         if _params.get("names"):
@@ -245,13 +253,19 @@ class LibSearchAPI(APIBase):
             query = query.join(models.LibsKeywords).join(models.Keywords, and_(
                 models.Keywords.name.in_(_params['keywords']),
                 models.Keywords.id == models.LibsKeywords.keyword_id))
-        if not count and (_params.get("authors") or _params.get("keywords")):
+        if _params.get("headers"):
+            query = query.join(models.LibHeaders, and_(
+                models.LibHeaders.name.in_(_params['headers']),
+                models.LibHeaders.lib_id == models.LibFTS.lib_id))
+
+        if not is_count and (_params.get("authors") or
+                             _params.get("keywords")):
             query = query.group_by(models.LibFTS.lib_id)
 
         # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
         for key, items in (_params or {}).iteritems():
-            if not items or key in ("authors", "keywords", "names"):
+            if not items or key not in ("frameworks", "platforms"):
                 continue
             _words.append('+("%s")' % '" "'.join(items))
 
@@ -259,13 +273,9 @@ class LibSearchAPI(APIBase):
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
                 Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords, models.LibFTS.examplefiles,
+                       models.LibFTS.keywords, models.LibFTS.headerslist,
                        models.LibFTS.authornames, models.LibFTS.frameworkslist,
                        models.LibFTS.platformslist], fts_query))
-        elif not count:
-            query = query.order_by(models.LibDLStats.month.desc(),
-                                   models.LibFTS.name)
-
         return query
 
 
@@ -427,10 +437,10 @@ class LibExamplesAPI(LibSearchAPI):
             perpage=self.perpage,
             items=items)
 
-    def _prepare_sql_query(self, count=False):
+    def _prepare_sql_query(self, is_count=False):
         _params, _words = self.search_query
 
-        if count:
+        if is_count:
             query = db_session.query(func.count(models.LibExamples.id))
         else:
             query = db_session.query(
@@ -440,34 +450,9 @@ class LibExamplesAPI(LibSearchAPI):
                 models.LibFTS.platformslist)
 
         query = query.join(models.Libs, models.LibFTS)
+        query = self._apply_filters_to_query(query, is_count)
 
-        # Relationship Way
-        _params = self.search_query['params']
-        if _params.get("authors"):
-            query = query.join(models.LibsAuthors).join(models.Authors, and_(
-                models.Authors.name.in_(_params['authors']),
-                models.Authors.id == models.LibsAuthors.author_id))
-
-        if _params.get("keywords"):
-            query = query.join(models.LibsKeywords).join(models.Keywords, and_(
-                models.Keywords.name.in_(_params['keywords']),
-                models.Keywords.id == models.LibsKeywords.keyword_id))
-
-        # Cached FTS Way
-        _words = self.make_fts_words_strict(self.search_query['words'])
-        for key, items in (_params or {}).iteritems():
-            if not items or key in ("authors", "keywords"):
-                continue
-            _words.append('+("%s")' % '" "'.join(items))
-
-        if _words:
-            fts_query = self.escape_fts_query(" ".join(_words))
-            query = query.filter(
-                Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords, models.LibFTS.examplefiles,
-                       models.LibFTS.authornames, models.LibFTS.frameworkslist,
-                       models.LibFTS.platformslist], fts_query))
-        elif not count:
+        if not self.search_query['words'] and not is_count:
             query = query.order_by(models.LibExamples.id.desc())
 
         return query
@@ -507,10 +492,10 @@ class LibInfoAPI(APIBase):
             result['dlstats'][k] = getattr(lib.dlstats, k)
 
         # examples
-        for name in lib.fts.examplefiles.split(","):
-            if name:
+        if lib.example_nums:
+            for item in lib.examples:
                 result['examples'].append(
-                    util.get_libexample_url(lib.id, name))
+                    util.get_libexample_url(lib.id, item.name))
 
         # latest version
         result['version'] = dict(
