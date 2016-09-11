@@ -86,14 +86,6 @@ def extract_archive(archive_path, destination_dir):
         raise NotImplementedError()
 
 
-def get_packages_dir():
-    return join(config['DL_PIO_DIR'], "packages")
-
-
-def get_package_url(package_name):
-    return "%s/packages/%s" % (config['DL_PIO_URL'], package_name)
-
-
 def get_libarch_relpath(lib_id, version_id):
     lib_id = int(lib_id)
     version_id = int(version_id)

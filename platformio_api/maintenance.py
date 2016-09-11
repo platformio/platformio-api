@@ -16,6 +16,7 @@ import logging
 from datetime import datetime, timedelta
 from math import ceil
 from os import remove
+from os.path import isfile, join
 from shutil import rmtree
 from urlparse import urlparse
 
@@ -24,7 +25,7 @@ from pkg_resources import parse_version
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import lazyload
 
-from platformio_api import models, util
+from platformio_api import config, models, util
 from platformio_api.crawler import LibSyncerFactory
 from platformio_api.database import db_session
 from platformio_api.vcsclient import VCSClientFactory
@@ -66,6 +67,7 @@ def process_pending_libs():
             db_session.commit()
 
             were_synced = True
+            purge_cache()
 
     if were_synced:
         optimise_sync_period()
@@ -76,7 +78,10 @@ def sync_libs():
         .filter(models.Libs.synced < datetime.utcnow() - timedelta(days=1),
                 models.Libs.active)
     for item in query.all():
+        before = item.updated
         sync_lib(item)
+        if before != item.updated:
+            purge_cache()
 
 
 def sync_lib(item):
@@ -278,3 +283,11 @@ def sync_arduino_libs():
         logger.info(
             "SyncArduinoLibs: Registered new library {name}, {website}".format(
                 **lib))
+
+
+def purge_cache():
+    flag_path = join(config['DL_PIO_DIR'], ".apicacheobsolete.flag")
+    if isfile(flag_path):
+        return
+    with open(flag_path, "w") as fp:
+        fp.write("")
