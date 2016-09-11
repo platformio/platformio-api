@@ -63,33 +63,6 @@ class PlatformsAPI(APIBase):
             join(config['DL_PIO_DIR'], "api-data", "platforms.json"))
 
 
-class PackagesManifestAPI(APIBase):
-
-    def get_result(self):
-        result = None
-        r = None
-
-        try:
-            headers = {"User-Agent": "PlatformIO/%s %s" %
-                       (__version__, requests.utils.default_user_agent())}
-            r = requests.get("https://dl.bintray.com/platformio/dl-packages/"
-                             "manifest_old.json",
-                             headers=headers,
-                             timeout=3)
-            result = r.json()
-            r.raise_for_status()
-        except:
-            result = util.load_json(
-                join(util.get_packages_dir(), "manifest.json"))
-            for name, versions in result.iteritems():
-                for item in versions:
-                    item['url'] = util.get_package_url(basename(item['url']))
-        finally:
-            if r:
-                r.close()
-        return result
-
-
 class LibSearchAPI(APIBase):
 
     ITEMS_PER_PAGE = 10

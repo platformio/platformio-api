@@ -91,11 +91,6 @@ def packages():
     return finalize_json_response(api.PackagesAPI, {})
 
 
-@app.route("/packages/manifest")
-def packages_manifest():
-    return finalize_json_response(api.PackagesManifestAPI, {})
-
-
 @app.route("/platforms")
 def platforms():
     return finalize_json_response(api.PlatformsAPI, {})
