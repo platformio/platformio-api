@@ -15,14 +15,12 @@
 import logging
 import re
 from datetime import datetime
-from itertools import chain
 from os.path import basename, join
 
-import requests
 from sqlalchemy import and_, distinct, func
 from sqlalchemy.orm.exc import NoResultFound
 
-from platformio_api import __version__, config, crawler, models, util
+from platformio_api import config, crawler, models, util
 from platformio_api.database import Match, db_session
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
 
