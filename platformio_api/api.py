@@ -215,30 +215,27 @@ class LibSearchAPI(APIBase):
         _params = self.search_query['params']
         if _params.get("names"):
             query = query.filter(models.LibFTS.name.in_(_params['names']))
-        if _params.get("authors"):
-            query = query.join(models.LibsAuthors).join(models.Authors, and_(
-                models.Authors.name.in_(_params['authors']),
-                models.Authors.id == models.LibsAuthors.author_id))
-        if _params.get("keywords"):
-            query = query.join(models.LibsKeywords).join(models.Keywords, and_(
-                models.Keywords.name.in_(_params['keywords']),
-                models.Keywords.id == models.LibsKeywords.keyword_id))
         if _params.get("headers"):
             query = query.join(models.LibHeaders, and_(
                 models.LibHeaders.name.in_(_params['headers']),
                 models.LibHeaders.lib_id == models.LibFTS.lib_id))
 
-        if not is_count and (_params.get("authors") or
-                             _params.get("keywords")):
+        need_grouping = False
+        for key in ("authors", "keywords", "frameworks", "platforms"):
+            if not _params.get(key):
+                continue
+            need_grouping = True
+            model_item = getattr(models, key.title())
+            model_lib_item = getattr(models, "Libs" + key.title())
+            query = query.join(model_item, model_item.name.in_(_params[key]))
+            query = query.join(model_lib_item, and_(
+                model_lib_item.lib_id == models.LibFTS.lib_id,
+                getattr(model_lib_item, key[:-1] + "_id") == model_item.id))
+
+        if not is_count and need_grouping:
             query = query.group_by(models.LibFTS.lib_id)
 
-        # Cached FTS Way
         _words = self.make_fts_words_strict(self.search_query['words'])
-        for key, items in (_params or {}).iteritems():
-            if not items or key not in ("frameworks", "platforms"):
-                continue
-            _words.append('+("%s")' % '" "'.join(items))
-
         if _words:
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
