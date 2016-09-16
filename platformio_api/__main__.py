@@ -89,6 +89,11 @@ def optimisesyncperiod():
     maintenance.optimise_sync_period()
 
 
+@cli.command()
+def purge_cache():
+    maintenance.purge_cache()
+
+
 def main():
     # https://urllib3.readthedocs.org
     # /en/latest/security.html#insecureplatformwarning
