@@ -96,6 +96,11 @@ def platforms():
     return finalize_json_response(api.PlatformsAPI, {})
 
 
+@app.route("/stats")
+def stats():
+    return finalize_json_response(api.PioStatsAPI, {})
+
+
 @app.route("/lib/search")
 def lib_search():
     args = dict(

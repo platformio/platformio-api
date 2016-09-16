@@ -35,30 +35,49 @@ class APIBase(object):
 
 class BoardsAPI(APIBase):
 
-    def get_result(self):
+    @staticmethod
+    def get_result():
         return util.load_json(
             join(config['DL_PIO_DIR'], "api-data", "boards.json"))
 
 
 class FrameworksAPI(APIBase):
 
-    def get_result(self):
+    @staticmethod
+    def get_result():
         return util.load_json(
             join(config['DL_PIO_DIR'], "api-data", "frameworks.json"))
 
 
 class PackagesAPI(APIBase):
 
-    def get_result(self):
+    @staticmethod
+    def get_result():
         return util.load_json(
             join(config['DL_PIO_DIR'], "api-data", "packages.json"))
 
 
 class PlatformsAPI(APIBase):
 
-    def get_result(self):
+    @staticmethod
+    def get_result():
         return util.load_json(
             join(config['DL_PIO_DIR'], "api-data", "platforms.json"))
+
+
+class PioStatsAPI(APIBase):
+
+    def get_result(self):
+        boards = BoardsAPI.get_result()
+        result = dict(
+            libs=db_session.query(func.count(models.Libs.id)).scalar(),
+            libexamples=db_session.query(func.count(
+                models.LibExamples.id)).scalar(),
+            boards=len(boards),
+            mcus=len(set([b['mcu'] for b in boards])),
+            platforms=len(PlatformsAPI.get_result())
+        )
+        return result
 
 
 class LibSearchAPI(APIBase):
