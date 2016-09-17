@@ -75,6 +75,7 @@ class PioStatsAPI(APIBase):
                 models.LibExamples.id)).scalar(),
             boards=len(boards),
             mcus=len(set([b['mcu'] for b in boards])),
+            frameworks=len(FrameworksAPI.get_result()),
             platforms=len(PlatformsAPI.get_result())
         )
         return result
