@@ -91,6 +91,7 @@ def sync_lib(item):
         sync_succeeded = ls.sync()
         if sync_succeeded:
             item.synced = datetime.utcnow()
+            purge_cache()
     item.active = bool(sync_succeeded)
     db_session.commit()
 
@@ -123,6 +124,7 @@ def rotate_libs_dlstats():
         synchronize_session=False)
 
     db_session.commit()
+    purge_cache()
 
 
 def remove_library_version_archive(lib_id, version_id):
@@ -150,8 +152,8 @@ def delete_library(lib_id):
 
     # remove information about library from database
     db_session.delete(lib)
-
     db_session.commit()
+    purge_cache()
 
 
 @util.rollback_on_exception_decorator(db_session, logger)
@@ -170,6 +172,7 @@ def cleanup_lib_versions(keep_versions):
             remove_library_version_archive(lib.id, version.id)
             db_session.delete(version)
     db_session.commit()
+    purge_cache()
 
 
 @util.rollback_on_exception_decorator(db_session, logger)
@@ -191,6 +194,7 @@ def delete_lib_version(version_id):
     db_session.delete(version)
     db_session.commit()
     remove_library_version_archive(lib_id, version_id)
+    purge_cache()
 
 
 @util.rollback_on_exception_decorator(db_session, logger)
