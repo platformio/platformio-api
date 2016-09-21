@@ -91,7 +91,6 @@ def sync_lib(item):
         sync_succeeded = ls.sync()
         if sync_succeeded:
             item.synced = datetime.utcnow()
-            purge_cache()
     item.active = bool(sync_succeeded)
     db_session.commit()
 
