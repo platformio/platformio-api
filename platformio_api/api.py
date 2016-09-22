@@ -233,6 +233,12 @@ class LibSearchAPI(APIBase):
     def _apply_filters_to_query(self, query, is_count=False):
         # Relationship Way
         _params = self.search_query['params']
+
+        # TMP: fix renamed platforms
+        if "espressif" in _params.get("platforms", []):
+            for i, item in enumerate(_params.get("platforms")):
+                _params['platforms'][i] = "espressif8266"
+
         if _params.get("names"):
             query = query.filter(models.LibFTS.name.in_(_params['names']))
         if _params.get("headers"):
