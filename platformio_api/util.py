@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import json
+import logging
+import socket
 from contextlib import contextmanager
 from glob import glob
 from math import ceil
 from os.path import join
-from socket import inet_aton, inet_ntoa
 from struct import pack, unpack
 from subprocess import check_call
 
@@ -26,6 +27,8 @@ import requests
 from platformio_api import __version__, config
 from platformio_api.exception import DLFileError, DLFileSizeError
 
+logger = logging.getLogger(__name__)
+
 
 def load_json(file_path):
     with open(file_path, "r") as f:
@@ -33,11 +36,17 @@ def load_json(file_path):
 
 
 def ip2int(ip_string):
-    return unpack("!I", inet_aton(ip_string))[0]
+    try:
+        return unpack("!I", socket.inet_aton(ip_string))[0]
+    except socket.error as e:
+        logger.error("Illegal IP address string passed to inet_aton: " +
+                     ip_string)
+        logger.exception(e)
+    return 0
 
 
 def int2ip(ip_int):
-    return inet_ntoa(pack("!I", ip_int))
+    return socket.inet_ntoa(pack("!I", ip_int))
 
 
 def download_file(source_url, destination_path):
@@ -47,12 +56,12 @@ def download_file(source_url, destination_path):
     f = None
     r = None
     try:
-        headers = {"User-Agent": "PlatformIOLibRegistry/%s %s" % (
-            __version__, requests.utils.default_user_agent())}
+        headers = {"User-Agent": "PlatformIOLibRegistry/%s %s" %
+                   (__version__, requests.utils.default_user_agent())}
         r = requests.get(source_url, headers=headers, stream=True)
         if r.status_code != 200:
-            raise DLFileError("status=%d, url=%s" % (
-                r.status_code, source_url))
+            raise DLFileError("status=%d, url=%s" % (r.status_code,
+                                                     source_url))
         if int(r.headers.get("content-length", 0)) > config['MAX_DLFILE_SIZE']:
             raise DLFileSizeError(config['MAX_DLFILE_SIZE'],
                                   int(r.headers['content-length']))
@@ -106,8 +115,8 @@ def get_libarch_url(lib_id, version_id):
 def get_libexample_relpath(lib_id):
     lib_id = int(lib_id)
     assert lib_id > 0
-    return join("libraries", "examples",
-                str(int(ceil(lib_id / 100))), str(lib_id))
+    return join("libraries", "examples", str(int(ceil(lib_id / 100))),
+                str(lib_id))
 
 
 def get_libexample_dir(lib_id):
@@ -135,11 +144,15 @@ def rollback_on_exception(session, logger=None):
 
 
 def rollback_on_exception_decorator(session, logger=None):
+
     def actual_decorator(f):
+
         def wrapped(*args, **kwargs):
             with rollback_on_exception(session, logger):
                 f(*args, **kwargs)
+
         return wrapped
+
     return actual_decorator
 
 
