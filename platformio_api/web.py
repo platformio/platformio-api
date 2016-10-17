@@ -58,7 +58,7 @@ def finalize_json_response(handler, kwargs):
 
     if error:
         item = dict(status=status, title=str(error))
-        result = dict(errors=[item])
+        result = dict(message=item['title'], errors=[item])
 
     response.status = status
     return json.dumps(result)
