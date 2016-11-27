@@ -23,7 +23,7 @@ from sys import modules
 from tempfile import mkdtemp, mkstemp
 
 import requests
-from git import GitCommandError, Repo
+from git import Repo
 from github import Github, GithubObject
 
 from platformio_api import config
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class VCSClientFactory(object):
 
     @staticmethod
-    def newClient(type_, url, branch=None):
+    def newClient(type_, url, branch=None, tag=None):
         assert type_ in ("git", "svn", "hg")
         if "github.com/" in url:
             type_ = "github"
@@ -44,25 +44,19 @@ class VCSClientFactory(object):
         if "bitbucket.org" in url:
             type_ = "bitbucket"
         clsname = "%sVCSClient" % type_.title()
-        obj = getattr(modules[__name__], clsname)(url, branch)
+        obj = getattr(modules[__name__], clsname)(url, branch, tag)
         assert isinstance(obj, VCSBaseClient)
         return obj
 
 
 class VCSBaseClient(object):
 
-    def __init__(self, url, branch):
+    def __init__(self, url, branch=None, tag=None):
         self.url = url
         self.branch = branch
+        self.tag = tag
 
-    def clone(self, destination_dir, revision=None):
-        """Clone the source code into the destination_dir.
-
-        Optional `revision` argument may be the identifier of commit (usually
-        SHA1), branch name or tag name. Defaults to the last commit in the
-        branch specified during initialization. If branch is not specified,
-        main repository branch will be used.
-        """
+    def clone(self, destination_dir):
         raise NotImplementedError()
 
     @property
@@ -77,45 +71,61 @@ class VCSBaseClient(object):
 
     def _download_and_unpack_archive(self, url, destination_dir):
         arch_path = mkstemp(".tar.gz")[1]
-        tmpdir = mkdtemp()
         try:
             download_file(url, arch_path)
-            extract_archive(arch_path, tmpdir)
+            extract_archive(arch_path, destination_dir)
 
-            srcdir = join(tmpdir, listdir(tmpdir)[0])
-            assert isdir(srcdir)
-
-            for item in listdir(srcdir):
-                item_path = join(srcdir, item)
-                if isfile(item_path):
-                    copy(item_path, join(destination_dir, item))
-                else:
-                    copytree(
-                        item_path, join(destination_dir, item), symlinks=True)
+            items = listdir(destination_dir)
+            subdir = None
+            if len(items) == 1 and isdir(join(destination_dir, items[0])):
+                subdir = join(destination_dir, items[0])
+            if subdir:
+                for item in listdir(subdir):
+                    item_path = join(subdir, item)
+                    if isfile(item_path):
+                        copy(item_path, join(destination_dir, item))
+                    else:
+                        copytree(
+                            item_path,
+                            join(destination_dir, item),
+                            symlinks=True)
+                rmtree(subdir)
         finally:
             remove(arch_path)
-            rmtree(tmpdir)
 
 
 class GitVCSClient(VCSBaseClient):
 
-    def __init__(self, url, branch):
-        super(GitVCSClient, self).__init__(url, branch)
-        self.repo = None
+    def __init__(self, url, branch=None, tag=None):
+        VCSBaseClient.__init__(self, url, branch, tag)
+        self._repo = self._init_repo()
 
-    def clone(self, destination_dir, revision=None):
-        repo = self._initialize_repo()
-        if revision:
-            if revision != self.branch and revision not in repo.tags:
-                try:
-                    repo.git.fetch('origin', 'tag', revision, depth=1)
-                except GitCommandError:
-                    pass
-            repo.git.checkout(revision)
+    def _init_repo(self):
+        kwargs = {"single-branch": True}
+        if not self.tag:
+            kwargs['depth'] = 1
+        if self.branch:
+            kwargs['branch'] = self.branch
+        repo = Repo.clone_from(
+            self.url, mkdtemp(prefix='gitclient-repo-'), **kwargs)
 
+        if not self.tag:
+            return repo
+
+        _tag = None
+        if self.tag in repo.tags:
+            _tag = self.tag
+        elif ("v" + self.tag) in repo.tags:
+            _tag = "v" + self.tag
+        if not _tag:
+            return repo
+        repo.git.checkout(_tag)
+        return repo
+
+    def clone(self, destination_dir):
         if isdir(destination_dir):
             rmtree(destination_dir)
-        copytree(repo.working_tree_dir, destination_dir)
+        copytree(self._repo.working_tree_dir, destination_dir)
         rmtree(join(destination_dir, ".git"))
 
     def get_last_commit(self, path=None):
@@ -123,62 +133,68 @@ class GitVCSClient(VCSBaseClient):
             raise NotImplementedError(
                 "`path` is not supported by GitVCSClient")
 
-        repo = self._initialize_repo()
-        commit = repo.commit()
+        commit = self._repo.commit()
         return dict(
             sha=commit.hexsha,
             date=datetime.fromtimestamp(commit.committed_date))
 
-    def _initialize_repo(self):
-        if not self.repo:
-            kwargs = {
-                'depth': 1,
-                'single-branch': True,
-            }
-            if self.branch:
-                kwargs['branch'] = self.branch
-            self.repo = Repo.clone_from(
-                self.url, mkdtemp(prefix='gitclient-repo-'), **kwargs)
-
-        return self.repo
-
     def __del__(self):
-        if self.repo and isdir(self.repo.working_tree_dir):
-            rmtree(self.repo.working_tree_dir)
+        if self._repo and isdir(self._repo.working_tree_dir):
+            rmtree(self._repo.working_tree_dir)
 
 
 class HgVCSClient(VCSBaseClient):
 
-    def __init__(self, url, branch):
+    def __init__(self, url, branch=None, tag=None):
         raise NotImplementedError()
 
 
 class SvnVCSClient(VCSBaseClient):
 
-    def __init__(self, url, branch):
+    def __init__(self, url, branch=None, tag=None):
         raise NotImplementedError()
 
 
 class GithubVCSClient(VCSBaseClient):
 
-    def __init__(self, url, branch):
-        VCSBaseClient.__init__(self, url, branch)
-        self._repoapi = None
+    def __init__(self, url, branch=None, tag=None):
+        VCSBaseClient.__init__(self, url, branch, tag)
+        self._repo = self._init_repo()
+
+    def _init_repo(self):
+        api = Github(config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'])
+
+        reposlug = self.url[self.url.index("github.com/") + 11:]
+        if reposlug.endswith(".git"):
+            reposlug = reposlug[:-4]
+        reposlug = reposlug.rstrip("/")
+        repo = api.get_repo(reposlug)
+
+        if not self.tag:
+            return repo
+
+        for tag in repo.get_tags():
+            if tag.name == self.tag:
+                break
+            if tag.name == ("v" + self.tag):
+                self.tag = tag.name
+                break
+
+        return repo
 
     @property
     def default_branch(self):
-        return self._repoapi_instance().default_branch
+        return self._repo.default_branch
 
     def get_last_commit(self, path=None):
         path = path or GithubObject.NotSet
-
         commit = None
-        repo = self._repoapi_instance()
-        revision = self.branch or self.default_branch or GithubObject.NotSet
+        revision = (self.tag or self.branch or self.default_branch or
+                    GithubObject.NotSet)
         folder_depth = 20
         while folder_depth:
             folder_depth -= 1
-            commits = repo.get_commits(sha=revision, path=path)
+            commits = self._repo.get_commits(sha=revision, path=path)
 
             if commits:
                 try:
@@ -194,37 +210,23 @@ class GithubVCSClient(VCSBaseClient):
         return dict(sha=commit.sha, date=commit.commit.author.date)
 
     def get_owner(self):
-        api = self._repoapi_instance()
         return dict(
-            name=api.owner.name if api.owner.name else api.owner.login,
-            email=api.owner.email,
-            url=api.owner.html_url)
+            name=self._repo.owner.name
+            if self._repo.owner.name else self._repo.owner.login,
+            email=self._repo.owner.email,
+            url=self._repo.owner.html_url)
 
-    def clone(self, destination_dir, revision=None):
-        api = self._repoapi_instance()
-        if revision is None:
-            revision = self.branch or self.default_branch
+    def clone(self, destination_dir):
         url = ("https://codeload.github.com/%s/legacy.tar.gz/%s" %
-               (api.full_name, revision))
+               (self._repo.full_name, self.tag or self.branch or
+                self.default_branch))
         self._download_and_unpack_archive(url, destination_dir)
-
-    def _repoapi_instance(self):
-        if self._repoapi is None:
-            api = Github(config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'])
-
-            repo = self.url[self.url.index("github.com/") + 11:]
-            if repo.endswith(".git"):
-                repo = repo[:-4]
-            repo = repo.rstrip("/")
-            self._repoapi = api.get_repo(repo)
-
-        return self._repoapi
 
 
 class MbedVCSClient(VCSBaseClient):
 
-    def __init__(self, url, branch):
-        VCSBaseClient.__init__(self, url, branch)
+    def __init__(self, url, branch=None, tag=None):
+        VCSBaseClient.__init__(self, url, branch, tag)
         self._last_commit = None
 
     def get_last_commit(self, path=None):
@@ -244,9 +246,8 @@ class MbedVCSClient(VCSBaseClient):
         self._last_commit = dict(sha=sha.groupdict()['sha'], date=date)
         return self._last_commit
 
-    def clone(self, destination_dir, revision=None):
-        if revision is None:
-            revision = self.get_last_commit()['sha']
+    def clone(self, destination_dir):
+        revision = self.tag or self.get_last_commit()['sha']
         try:
             archive_url = "%(repo_url)sarchive/%(revision)s.tar.gz" % dict(
                 repo_url=self.url, revision=revision)
@@ -257,8 +258,10 @@ class MbedVCSClient(VCSBaseClient):
             if exists(destination_dir):
                 rmtree(destination_dir)
             mkdir(destination_dir)
-            check_call(["hg", "clone", "--updaterev", revision, self.url,
-                        destination_dir])
+            check_call([
+                "hg", "clone", "--updaterev", revision, self.url,
+                destination_dir
+            ])
 
 
 class BitbucketVCSClient(VCSBaseClient):
@@ -271,8 +274,8 @@ class BitbucketVCSClient(VCSBaseClient):
     ARCHIVE_URL = "https://bitbucket.org/" \
                   "%(owner)s/%(repo_slug)s/get/%(revision)s.tar.gz"
 
-    def __init__(self, url, branch):
-        VCSBaseClient.__init__(self, url, branch)
+    def __init__(self, url, branch=None, tag=None):
+        VCSBaseClient.__init__(self, url, branch, tag)
         self._last_commit = None
 
         # Extract username and repo slug from url
@@ -300,9 +303,8 @@ class BitbucketVCSClient(VCSBaseClient):
             date=datetime.strptime(commit["date"], "%Y-%m-%dT%H:%M:%S+00:00"))
         return self._last_commit
 
-    def clone(self, destination_dir, revision=None):
-        if revision is None:
-            revision = self.get_last_commit()['sha']
+    def clone(self, destination_dir):
+        revision = self.tag or self.get_last_commit()['sha']
         url = self.ARCHIVE_URL % dict(
             owner=self.owner,
             repo_slug=self.repo_slug,

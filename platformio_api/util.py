@@ -15,6 +15,8 @@
 import json
 import logging
 import socket
+import tarfile
+import zipfile
 from contextlib import contextmanager
 from glob import glob
 from math import ceil
@@ -88,9 +90,11 @@ def create_archive(archive_path, source_dir):
 
 def extract_archive(archive_path, destination_dir):
     if archive_path.endswith(".tar.gz"):
-        check_call(["tar", "xfz", archive_path, "-C", destination_dir])
+        with tarfile.open(archive_path) as tar:
+            tar.extractall(destination_dir)
     elif archive_path.endswith(".zip"):
-        check_call(["unzip", "-q", archive_path, "-d", destination_dir])
+        with zipfile.ZipFile(archive_path) as zip_:
+            zip_.extractall(destination_dir)
     else:
         raise NotImplementedError()
 

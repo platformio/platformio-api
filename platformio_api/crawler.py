@@ -35,7 +35,7 @@ from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       PlatformioAPIException)
 from platformio_api.util import get_c_sources
-from platformio_api.vcsclient import MbedVCSClient, VCSClientFactory
+from platformio_api.vcsclient import VCSClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +75,12 @@ class LibSyncerBase(object):
         if "repository" in self.config:
             _type = self.config['repository'].get("type", "").lower()
             url = self.config['repository'].get("url", "")
-            branch = self.config['repository'].get("branch", None)
             if _type and url:
-                self.vcsclient = VCSClientFactory.newClient(_type, url, branch)
+                self.vcsclient = VCSClientFactory.newClient(
+                    _type,
+                    url,
+                    branch=self.config['repository'].get("branch", None),
+                    tag=self.config.get("version", None))
 
     @staticmethod
     def clean_dict(data):
@@ -145,7 +148,7 @@ class LibSyncerBase(object):
 
         if self.vcsclient:
             path = None
-            inclist = self.config.get("include", None)
+            inclist = self.config.get("export", {}).get("include", None)
             if isinstance(inclist, basestring):
                 path = inclist
             commit = self.vcsclient.get_last_commit(path=path)
@@ -346,9 +349,8 @@ class LibSyncerBase(object):
         # update items in DB
         setattr(self.lib, what, dbitems)
         # save in string format for FTS
-        setattr(self.lib.fts, what + "list", ",".join([
-            "%s:%s" % (item.name, item.title) for item in dbitems
-        ]))
+        setattr(self.lib.fts, what + "list", ",".join(
+            ["%s:%s" % (item.name, item.title) for item in dbitems]))
 
         return items
 
@@ -388,31 +390,12 @@ class LibSyncerBase(object):
             finally:
                 remove(tmparh_path)
         elif self.vcsclient:
-            revisions_by_priority = ["v" + self.config["version"],
-                                     self.config["version"]]
-            if isinstance(self.vcsclient, MbedVCSClient):
-                revisions_by_priority = revisions_by_priority[1:]
-            cloning_succeded = False
-            for revision in revisions_by_priority:
-                try:
-                    # cleanup destination directory
-                    if isdir(src_dir):
-                        rmtree(src_dir)
-                        makedirs(src_dir)
-                    self.vcsclient.clone(src_dir, revision)
-                    cloning_succeded = True
-                    break
-                except:
-                    continue
-
-            if not cloning_succeded:
-                self.vcsclient.clone(src_dir)
+            self.vcsclient.clone(src_dir)
         else:
             raise PlatformioAPIException()
 
-        return all([
-            self._export_exclude(src_dir), self._export_include(src_dir)
-        ])
+        return all(
+            [self._export_exclude(src_dir), self._export_include(src_dir)])
 
     def _export_exclude(self, src_dir):
         exclist = self.config.get("export", {}).get("exclude", [])
@@ -631,8 +614,8 @@ class ArduinoLibSyncer(LibSyncerBase):
 
         #####
         keywords = []
-        for keyword in re.split(r"[\s/]+", manifest.get("category",
-                                                        "Uncategorized")):
+        for keyword in re.split(r"[\s/]+",
+                                manifest.get("category", "Uncategorized")):
             keyword = keyword.strip()
             if not keyword:
                 continue
@@ -707,9 +690,8 @@ class ArduinoLibSyncer(LibSyncerBase):
             "homepage": homepage,
             "export": {
                 "include": include,
-                "exclude": [
-                    "extras", "docs", "tests", "test", "*.doxyfile", "*.pdf"
-                ]
+                "exclude":
+                ["extras", "docs", "tests", "test", "*.doxyfile", "*.pdf"]
             }
         }
         return config
@@ -770,9 +752,7 @@ class YottaLibSyncer(LibSyncerBase):
             "dependencies": manifest.get("dependencies"),
             "license": manifest.get("license"),
             "export": {
-                "exclude": [
-                    "tests", "test", "*.doxyfile", "*.pdf"
-                ]
+                "exclude": ["tests", "test", "*.doxyfile", "*.pdf"]
             }
         }
         return config
