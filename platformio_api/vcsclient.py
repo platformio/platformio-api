@@ -173,12 +173,12 @@ class GithubVCSClient(VCSBaseClient):
         if not self.tag:
             return repo
 
+        _tag = None
         for tag in repo.get_tags():
-            if tag.name == self.tag:
+            if tag.name in (self.tag, "v" + self.tag):
+                _tag = tag.name
                 break
-            if tag.name == ("v" + self.tag):
-                self.tag = tag.name
-                break
+        self.tag = _tag
 
         return repo
 
@@ -290,18 +290,19 @@ class BitbucketVCSClient(VCSBaseClient):
 
         if not self.tag:
             return
+
         response = requests.get(self.TAGS_URL % dict(
             owner=self._owner,
             repo_slug=self._repo_slug, ))
         assert 200 == response.status_code, "Bitbucket API request failed"
+        _tag = None
         for value in response.json()['values']:
             if value['type'] != "tag":
                 continue
-            if value['name'] == self.tag:
-                return
-            if value['name'] == ("v" + self.tag):
-                self.tag = ("v" + self.tag)
-                return
+            if value['name'] in (self.tag, "v" + self.tag):
+                _tag = value['name']
+                break
+        self.tag = _tag
 
     def get_last_commit(self, path=None):
         if self._last_commit:

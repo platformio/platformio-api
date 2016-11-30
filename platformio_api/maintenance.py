@@ -55,6 +55,7 @@ def process_pending_libs():
     for (item, lib_id) in query.all():
         if lib_id:
             continue
+        logger.info("Processing pending library: %s", item.conf_url)
         with util.rollback_on_exception(db_session, logger):
             lib = models.Libs(id=get_free_lib_id(), conf_url=item.conf_url)
             lib.dlstats = models.LibDLStats(day=0, week=0, month=0)
