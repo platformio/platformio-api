@@ -271,30 +271,46 @@ class BitbucketVCSClient(VCSBaseClient):
     COMMITS_URL = "https://bitbucket.org/" \
                   "api/2.0/repositories/%(owner)s/%(repo_slug)s/commits/" \
                   "%(revision)s"
+    TAGS_URL = "https://bitbucket.org/" \
+                  "api/2.0/repositories/%(owner)s/%(repo_slug)s/refs/tags"
+
     ARCHIVE_URL = "https://bitbucket.org/" \
                   "%(owner)s/%(repo_slug)s/get/%(revision)s.tar.gz"
 
     def __init__(self, url, branch=None, tag=None):
         VCSBaseClient.__init__(self, url, branch, tag)
         self._last_commit = None
+        self._init_repo()
 
-        # Extract username and repo slug from url
+    def _init_repo(self):
         _, valuable_part = self.url.split("bitbucket.org/")
         parts = valuable_part.split('/')
-        self.owner = parts[0]
-        self.repo_slug = parts[1]
+        self._owner = parts[0].lower()
+        self._repo_slug = parts[1].lower()
+
+        if not self.tag:
+            return
+        response = requests.get(self.TAGS_URL % dict(
+            owner=self._owner,
+            repo_slug=self._repo_slug, ))
+        assert 200 == response.status_code, "Bitbucket API request failed"
+        for value in response.json()['values']:
+            if value['type'] != "tag":
+                continue
+            if value['name'] == self.tag:
+                return
+            if value['name'] == ("v" + self.tag):
+                self.tag = ("v" + self.tag)
+                return
 
     def get_last_commit(self, path=None):
-        if self._last_commit is not None:
+        if self._last_commit:
             return self._last_commit
-
-        if not self.branch:
-            self.retrieve_main_branch()
-
+        revision = self.tag or self.branch or self.get_main_branch()
         response = requests.get(self.COMMITS_URL % dict(
-            owner=self.owner,
-            repo_slug=self.repo_slug,
-            revision=self.branch, ))
+            owner=self._owner,
+            repo_slug=self._repo_slug,
+            revision=revision, ))
         assert 200 == response.status_code, "Bitbucket API request failed"
 
         commit = response.json()["values"][0]
@@ -304,17 +320,16 @@ class BitbucketVCSClient(VCSBaseClient):
         return self._last_commit
 
     def clone(self, destination_dir):
-        revision = self.tag or self.get_last_commit()['sha']
+        revision = self.get_last_commit()['sha']
         url = self.ARCHIVE_URL % dict(
-            owner=self.owner,
-            repo_slug=self.repo_slug,
+            owner=self._owner,
+            repo_slug=self._repo_slug,
             revision=revision, )
         self._download_and_unpack_archive(url, destination_dir)
 
-    def retrieve_main_branch(self):
+    def get_main_branch(self):
         response = requests.get(self.MAIN_BRANCH_URL % dict(
-            owner=self.owner,
-            repo_slug=self.repo_slug, ))
+            owner=self._owner,
+            repo_slug=self._repo_slug, ))
         assert 200 == response.status_code, "Bitbucket API request failed"
-
-        self.branch = response.json()["name"]
+        return response.json()["name"]
