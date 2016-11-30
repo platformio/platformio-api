@@ -675,7 +675,7 @@ class ArduinoLibSyncer(LibSyncerBase):
 
         #####
         homepage = None
-        if "url" in manifest and manifest['url'] != repository['url']:
+        if manifest.get("url", None) and manifest['url'] != repository['url']:
             homepage = manifest['url']
 
         config = {
