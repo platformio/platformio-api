@@ -383,6 +383,9 @@ class LibInfoAPI(APIBase):
             for l in _list:
                 if ":" in l:
                     result[what].append(l.split(":")[0])
+        # headers
+        result['headers'] = lib.fts.headerslist.split(
+            ",") if lib.fts.headerslist else []
 
         # attributes
         attributes = {}
