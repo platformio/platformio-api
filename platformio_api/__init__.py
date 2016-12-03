@@ -18,7 +18,7 @@ import os
 from time import tzset
 
 
-VERSION = (1, 14, 0)
+VERSION = (1, 14, 1)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
@@ -37,7 +37,7 @@ config = dict(
     GITHUB_PASSWORD=None,
     DL_PIO_DIR=None,
     DL_PIO_URL=None,
-    MAX_DLFILE_SIZE=1024 * 1024 * 50,  # 50 Mb
+    MAX_DLFILE_SIZE=1024 * 1024 * 150,  # 150 Mb
 
     # Fuzzy search will not be applied to words shorter than the value below
     SOLR_FUZZY_MIN_WORD_LENGTH=3,
