@@ -14,10 +14,11 @@
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from os.path import basename, join
 
-from sqlalchemy import and_, distinct, func
+from sqlalchemy import and_, desc, distinct, func
+from sqlalchemy.sql import label
 from sqlalchemy.orm.exc import NoResultFound
 
 from platformio_api import config, crawler, models, util
@@ -71,13 +72,12 @@ class PioStatsAPI(APIBase):
         boards = BoardsAPI.get_result()
         result = dict(
             libs=db_session.query(func.count(models.Libs.id)).scalar(),
-            libexamples=db_session.query(func.count(
-                models.LibExamples.id)).scalar(),
+            libexamples=db_session.query(func.count(models.LibExamples.id))
+            .scalar(),
             boards=len(boards),
             mcus=len(set([b['mcu'] for b in boards])),
             frameworks=len(FrameworksAPI.get_result()),
-            platforms=len(PlatformsAPI.get_result())
-        )
+            platforms=len(PlatformsAPI.get_result()))
         return result
 
 
@@ -184,8 +184,10 @@ class LibSearchAPI(APIBase):
         if all([v is None for v in state.values()]):
             return {"params": params, "words": words}
         else:
-            return {"params": {},
-                    "words": [i.strip() for i in query.split(" ") if len(i)]}
+            return {
+                "params": {},
+                "words": [i.strip() for i in query.split(" ") if len(i)]
+            }
 
     def make_fts_words_strict(self, words):
         items = []
@@ -242,9 +244,11 @@ class LibSearchAPI(APIBase):
         if _params.get("names"):
             query = query.filter(models.LibFTS.name.in_(_params['names']))
         if _params.get("headers"):
-            query = query.join(models.LibHeaders, and_(
-                models.LibHeaders.name.in_(_params['headers']),
-                models.LibHeaders.lib_id == models.LibFTS.lib_id))
+            query = query.join(
+                models.LibHeaders,
+                and_(
+                    models.LibHeaders.name.in_(_params['headers']),
+                    models.LibHeaders.lib_id == models.LibFTS.lib_id))
 
         need_grouping = False
         for key in ("authors", "keywords", "frameworks", "platforms"):
@@ -254,9 +258,11 @@ class LibSearchAPI(APIBase):
             model_item = getattr(models, key.title())
             model_lib_item = getattr(models, "Libs" + key.title())
             query = query.join(model_item, model_item.name.in_(_params[key]))
-            query = query.join(model_lib_item, and_(
-                model_lib_item.lib_id == models.LibFTS.lib_id,
-                getattr(model_lib_item, key[:-1] + "_id") == model_item.id))
+            query = query.join(
+                model_lib_item,
+                and_(model_lib_item.lib_id == models.LibFTS.lib_id,
+                     getattr(model_lib_item, key[:-1] + "_id") ==
+                     model_item.id))
 
         if not is_count and need_grouping:
             query = query.group_by(models.LibFTS.lib_id)
@@ -265,10 +271,12 @@ class LibSearchAPI(APIBase):
         if _words:
             fts_query = self.escape_fts_query(" ".join(_words))
             query = query.filter(
-                Match([models.LibFTS.name, models.LibFTS.description,
-                       models.LibFTS.keywords, models.LibFTS.headerslist,
-                       models.LibFTS.authornames, models.LibFTS.frameworkslist,
-                       models.LibFTS.platformslist], fts_query))
+                Match([
+                    models.LibFTS.name, models.LibFTS.description,
+                    models.LibFTS.keywords, models.LibFTS.headerslist,
+                    models.LibFTS.authornames, models.LibFTS.frameworkslist,
+                    models.LibFTS.platformslist
+                ], fts_query))
         return query
 
 
@@ -410,10 +418,11 @@ class LibDownloadAPI(APIBase):
         if self.version:
             query = db_session.query(
                 models.Libs.id, models.LibVersions.id,
-                models.LibVersions.name).outerjoin(models.LibVersions, and_(
-                    models.LibVersions.lib_id == models.Libs.id,
-                    models.LibVersions.name == self.version)).filter(
-                        models.Libs.id == self.id_)
+                models.LibVersions.name).outerjoin(
+                    models.LibVersions,
+                    and_(models.LibVersions.lib_id == models.Libs.id,
+                         models.LibVersions.name == self.version)).filter(
+                             models.Libs.id == self.id_)
         else:
             query = db_session.query(models.Libs.id, models.LibVersions.id,
                                      models.LibVersions.name).join(
@@ -446,7 +455,9 @@ class LibDownloadAPI(APIBase):
         ip_int = util.ip2int(self.ip)
         try:
             query = db_session.query(models.LibDLLog).filter(
-                models.LibDLLog.lib_id == lib_id, models.LibDLLog.ip == ip_int)
+                models.LibDLLog.lib_id == lib_id,
+                models.LibDLLog.date > datetime.utcnow() - timedelta(days=30),
+                models.LibDLLog.ip == ip_int)
             item = query.one()
             item.date = datetime.utcnow()
         except NoResultFound:
@@ -490,8 +501,9 @@ class LibVersionAPI(APIBase):
     def get_result(self):
         result = dict()
         query = db_session.query(models.Libs.id, models.LibVersions.name).join(
-            models.LibVersions, models.LibVersions.id ==
-            models.Libs.latest_version_id).filter(models.Libs.id.in_(self.ids))
+            models.LibVersions,
+            models.LibVersions.id == models.Libs.latest_version_id).filter(
+                models.Libs.id.in_(self.ids))
         result = {i[0]: i[1] for i in query.all()}
         for id_ in self.ids:
             if id_ not in result:
@@ -594,17 +606,25 @@ class LibStatsAPI(APIBase):
         query = db_session.query(
             models.Keywords.name, func.count(models.Keywords.id).label(
                 "total")).join(models.LibsKeywords).group_by(
-                    models.Keywords.id).order_by("total DESC").limit(limit)
+                    models.Keywords.id).order_by(desc("total")).limit(limit)
         for item in query.all():
             items.append(item[0])
         return items
 
-    def _get_most_downloaded(self, period, limit=5):
+    def _get_most_downloaded(self, period, limit=10):
+        period_prev = getattr(models.LibDLStats, "%s_prev" % period.key)
         items = []
         query = db_session.query(
-            period, models.LibFTS.lib_id, models.LibFTS.name).join(
-                models.LibFTS, models.LibDLStats.lib_id ==
-                models.LibFTS.lib_id).order_by(period.desc()).limit(limit)
+                period,
+                label("diff", period - period_prev),
+                models.LibFTS.lib_id, models.LibFTS.name)\
+            .join(models.LibFTS,
+                  models.LibDLStats.lib_id == models.LibFTS.lib_id)\
+            .filter(period >= period_prev)\
+            .order_by(desc("diff"))\
+            .limit(limit)
         for item in query.all():
-            items.append(dict(id=item[1], name=item[2], total=item[0]))
+            items.append(
+                dict(
+                    id=item[2], name=item[3], total=item[0], diff=item[1]))
         return items

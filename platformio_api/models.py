@@ -165,7 +165,8 @@ class LibDLLog(Base):
     lib_id = Column(
         INTEGER(unsigned=True), ForeignKey("libs.id"), primary_key=True)
     ip = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=False)
-    date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    date = Column(
+        DateTime, nullable=False, primary_key=True, default=datetime.utcnow)
 
 
 class LibDLStats(Base):
@@ -173,9 +174,12 @@ class LibDLStats(Base):
 
     lib_id = Column(
         INTEGER(unsigned=True), ForeignKey("libs.id"), primary_key=True)
-    day = Column(INTEGER(unsigned=True), nullable=False, index=True)
-    week = Column(INTEGER(unsigned=True), nullable=False, index=True)
-    month = Column(INTEGER(unsigned=True), nullable=False, index=True)
+    day = Column(INTEGER(unsigned=True), nullable=False)
+    week = Column(INTEGER(unsigned=True), nullable=False)
+    month = Column(INTEGER(unsigned=True), nullable=False)
+    day_prev = Column(INTEGER(unsigned=True), nullable=False)
+    week_prev = Column(INTEGER(unsigned=True), nullable=False)
+    month_prev = Column(INTEGER(unsigned=True), nullable=False)
 
 
 class LibExamples(Base):

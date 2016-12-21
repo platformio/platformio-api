@@ -34,7 +34,7 @@ def db_disconnect():
 def finalize_json_response(handler, kwargs):
     assert issubclass(handler, api.APIBase)
     response.set_header("Access-Control-Allow-Origin",
-                        config['API_CORS_ORIGIN'])
+                        str(config['API_CORS_ORIGIN']))
     response.set_header("Access-Control-Allow-Methods",
                         "GET, POST, PUT, DELETE, OPTIONS")
     response.set_header("Access-Control-Allow-Headers",

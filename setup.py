@@ -30,7 +30,7 @@ setup(
         "click<6",
         "bottle",
         "MySQL-python",
-        "SQLAlchemy<1.1",
+        "SQLAlchemy<1.2",
         "requests",
         "PyGithub>=1.26,<2",
         "GitPython"

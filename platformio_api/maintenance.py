@@ -106,22 +106,55 @@ def sync_lib_by_id(lib_id):
 
 
 def rotate_libs_dlstats():
+    today = datetime.utcnow().replace(
+        hour=0, minute=0, second=0, microsecond=0)
+
     # delete obsolete logs
     db_session.query(models.LibDLLog.lib_id).filter(
-        models.LibDLLog.date < datetime.utcnow() - timedelta(days=30)).delete()
+        models.LibDLLog.date < today - timedelta(days=60)).delete()
 
     db_session.query(models.LibDLStats).update(
         dict(
-            day=0,
+
+            day=select([func.count(1)]).where(
+                and_(
+                    models.LibDLLog.lib_id == models.LibDLStats.lib_id,
+                    models.LibDLLog.date >= today)
+                ).as_scalar(),
+
             week=select([func.count(1)]).where(
                 and_(
                     models.LibDLLog.lib_id == models.LibDLStats.lib_id,
-                    models.LibDLLog.date > datetime.utcnow() - timedelta(
-                        days=7))).as_scalar(),
+                    models.LibDLLog.date >= today - timedelta(days=7))
+                ).as_scalar(),
+
             month=select([func.count(1)]).where(
-                models.LibDLLog.lib_id ==
-                models.LibDLStats.lib_id).as_scalar()),
-        synchronize_session=False)
+                and_(
+                    models.LibDLLog.lib_id == models.LibDLStats.lib_id,
+                    models.LibDLLog.date >= today - timedelta(days=30))
+                ).as_scalar(),
+
+            day_prev=select([func.count(1)]).where(
+                and_(
+                    models.LibDLLog.lib_id == models.LibDLStats.lib_id,
+                    models.LibDLLog.date < today,
+                    models.LibDLLog.date >= today - timedelta(days=1))
+                ).as_scalar(),
+
+            week_prev=select([func.count(1)]).where(
+                and_(
+                    models.LibDLLog.lib_id == models.LibDLStats.lib_id,
+                    models.LibDLLog.date < today - timedelta(days=7),
+                    models.LibDLLog.date >= today - timedelta(days=14))
+                ).as_scalar(),
+
+            month_prev=select([func.count(1)]).where(
+                and_(
+                    models.LibDLLog.lib_id == models.LibDLStats.lib_id,
+                    models.LibDLLog.date < today - timedelta(days=30))
+                ).as_scalar()
+
+        ), synchronize_session=False)
 
     db_session.commit()
     purge_cache()
