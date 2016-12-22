@@ -174,12 +174,12 @@ class LibDLStats(Base):
 
     lib_id = Column(
         INTEGER(unsigned=True), ForeignKey("libs.id"), primary_key=True)
-    day = Column(INTEGER(unsigned=True), nullable=False)
-    week = Column(INTEGER(unsigned=True), nullable=False)
-    month = Column(INTEGER(unsigned=True), nullable=False)
-    day_prev = Column(INTEGER(unsigned=True), nullable=False)
-    week_prev = Column(INTEGER(unsigned=True), nullable=False)
-    month_prev = Column(INTEGER(unsigned=True), nullable=False)
+    day = Column(INTEGER(unsigned=True), nullable=False, default=0)
+    week = Column(INTEGER(unsigned=True), nullable=False, default=0)
+    month = Column(INTEGER(unsigned=True), nullable=False, default=0)
+    day_prev = Column(INTEGER(unsigned=True), nullable=False, default=0)
+    week_prev = Column(INTEGER(unsigned=True), nullable=False, default=0)
+    month_prev = Column(INTEGER(unsigned=True), nullable=False, default=0)
 
 
 class LibExamples(Base):
