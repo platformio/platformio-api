@@ -125,7 +125,10 @@ class Libs(Base):
         secondary="libs_platforms",
         cascade="save-update, merge, refresh-expire, "
         "expunge")
-    versions = relationship("LibVersions", cascade="all")
+    versions = relationship(
+        "LibVersions",
+        cascade="all",
+        order_by="LibVersions.released, models.LibVersions.id")
 
 
 class LibsAttributes(Base):
