@@ -377,6 +377,14 @@ class LibInfoAPI(APIBase):
             name=libversion.name,
             released=libversion.released.strftime("%Y-%m-%dT%H:%M:%SZ"))
 
+        # previous versions
+        result['versions'] = [
+            dict(
+                name=l.name,
+                released=l.released.strftime("%Y-%m-%dT%H:%M:%SZ"))
+            for l in lib.versions
+        ]
+
         # authors
         for item in lib.authors:
             _author = {"maintainer": item.maintainer}
