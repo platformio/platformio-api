@@ -101,12 +101,14 @@ def stats():
     return finalize_json_response(api.PioStatsAPI, {})
 
 
-@app.route("/lib/search")
-def lib_search():
+@app.route("<apiver:re:(/v\d+)?/>lib/search")
+def lib_search(apiver):
+    apiver = int(apiver[2:-1]) if "/v" in apiver else 1
     args = dict(
         query=unquote(request.query.query[:255]),
         page=int(request.query.page) if request.query.page else 0,
         # perpage=int(request.query.perpage) if request.query.perpage else 0
+        api_version=apiver
     )
     return finalize_json_response(api.LibSearchAPI, args)
 
