@@ -163,6 +163,8 @@ def rollback_on_exception_decorator(session, logger=None):
 def parse_namedtitled_list(ntlist):
     items = []
     for item in ntlist.split(","):
-        if ":" in item:
-            items.append(item.split(":")[0])
+        if ":" not in item:
+            continue
+        name, title = item.split(":")
+        items.append(dict(name=name, title=title))
     return items

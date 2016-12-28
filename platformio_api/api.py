@@ -394,11 +394,9 @@ class LibInfoAPI(APIBase):
 
         # frameworks & platforms
         for what in ("frameworks", "platforms"):
-            result[what] = []
-            _list = getattr(lib.fts, what + "list").split(",")
-            for l in _list:
-                if ":" in l:
-                    result[what].append(l.split(":")[0])
+            result[what] = util.parse_namedtitled_list(
+                getattr(lib.fts, what + "list"))
+
         # headers
         result['headers'] = lib.fts.headerslist.split(
             ",") if lib.fts.headerslist else []
