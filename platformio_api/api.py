@@ -85,12 +85,13 @@ class LibSearchAPI(APIBase):
 
     ITEMS_PER_PAGE = 10
 
-    def __init__(self, query=None, page=1, perpage=None):
+    def __init__(self, query=None, page=1, perpage=None, api_version=1):
         # if not query:
         #     raise APIBadRequest("Please specify '?query' parameter")
         self.search_query = self.parse_search_query(query)
         self.page = page
         self.perpage = perpage or self.ITEMS_PER_PAGE
+        self.api_version = api_version
 
         self.total = self.get_total()
 
@@ -119,8 +120,10 @@ class LibSearchAPI(APIBase):
                     description=lib_description,
                     keywords=lib_keywords.split(","),
                     authornames=authornames.split(","),
-                    frameworks=util.parse_namedtitled_list(frameworkslist),
-                    platforms=util.parse_namedtitled_list(platformslist),
+                    frameworks=util.parse_namedtitled_list(
+                        frameworkslist, self.api_version == 1),
+                    platforms=util.parse_namedtitled_list(
+                        platformslist, self.api_version == 1),
                     dlmonth=dlmonth,
                     examplenums=example_nums,
                     updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")))

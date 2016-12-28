@@ -160,11 +160,14 @@ def rollback_on_exception_decorator(session, logger=None):
     return actual_decorator
 
 
-def parse_namedtitled_list(ntlist):
+def parse_namedtitled_list(ntlist, only_names=False):
     items = []
     for item in ntlist.split(","):
         if ":" not in item:
             continue
         name, title = item.split(":")
-        items.append(dict(name=name, title=title))
+        if only_names:
+            items.append(name)
+        else:
+            items.append(dict(name=name, title=title))
     return items
