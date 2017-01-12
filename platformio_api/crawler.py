@@ -89,7 +89,7 @@ class LibSyncerBase(object):
             if isinstance(data[key], dict) or isinstance(data[key], list):
                 data[key] = LibSyncerBase.clean_dict(data[key])
             elif isinstance(data[key], basestring):
-                data[key] = data[key].strip().decode("utf-8")
+                data[key] = data[key].strip()
         return data
 
     @staticmethod
