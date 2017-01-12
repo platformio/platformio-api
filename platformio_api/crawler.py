@@ -1,4 +1,4 @@
-# Copyright 2014-2015 Ivan Kravets <me@ikravets.com>
+# Copyright 2014-present Ivan Kravets <me@ikravets.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ class LibSyncerBase(object):
             if isinstance(data[key], dict) or isinstance(data[key], list):
                 data[key] = LibSyncerBase.clean_dict(data[key])
             elif isinstance(data[key], basestring):
-                data[key] = data[key].strip().decode("utf-8")
+                data[key] = data[key].strip()
         return data
 
     @staticmethod
@@ -540,7 +540,7 @@ class LibSyncerBase(object):
             else:
                 for fmask in exmglobs:
                     exmfiles += glob(join(src_dir, fmask))
-        return exmfiles
+        return [f for f in exmfiles if isfile(f)]
 
     def _fetch_mbed_example_files(self, urls, tmp_dir):
         actual_examples_dir = mkdtemp(dir=tmp_dir)

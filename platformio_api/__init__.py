@@ -1,4 +1,4 @@
-# Copyright 2014-2015 Ivan Kravets <me@ikravets.com>
+# Copyright 2014-present Ivan Kravets <me@ikravets.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import os
 from time import tzset
 
 
-VERSION = (1, 17, 1)
+VERSION = (1, 17, 2)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
