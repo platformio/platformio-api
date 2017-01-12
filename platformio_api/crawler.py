@@ -540,7 +540,7 @@ class LibSyncerBase(object):
             else:
                 for fmask in exmglobs:
                     exmfiles += glob(join(src_dir, fmask))
-        return exmfiles
+        return [f for f in exmfiles if isfile(f)]
 
     def _fetch_mbed_example_files(self, urls, tmp_dir):
         actual_examples_dir = mkdtemp(dir=tmp_dir)
