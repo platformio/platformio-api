@@ -90,6 +90,8 @@ class LibSyncerBase(object):
                 data[key] = LibSyncerBase.clean_dict(data[key])
             elif isinstance(data[key], basestring):
                 data[key] = data[key].strip()
+                if not isinstance(data[key], unicode):
+                    data[key] = data[key].decode("utf-8")
         return data
 
     @staticmethod
