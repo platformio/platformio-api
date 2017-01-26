@@ -557,8 +557,9 @@ class LibRegisterAPI(APIBase):
             result['message'] = str(e)
         except Exception as e:
             logger.exception(e)
-            result['message'] = ("Could not retrieve a library data by "
-                                 "this URL -> " + self.conf_url)
+            result['message'] = (
+                "Invalid URL or broken manifest. "
+                "Please validate it with http://jsonlint.com")
         return result
 
 

@@ -251,6 +251,9 @@ def sync_arduino_libs():
         return url
 
     used_urls = set()
+    for item in db_session.query(models.PendingLibs).all():
+        used_urls.add(item.conf_url.lower())
+
     query = db_session\
         .query(models.LibsAttributes.value)\
         .join(models.Attributes)\
@@ -270,8 +273,6 @@ def sync_arduino_libs():
     del libs_index
 
     for lib in libs.values():
-        if _cleanup_url(lib['website']).lower() in used_urls:
-            continue
         github_url = "https://github.com/{}/{}"
         if "github.com" in lib['website'] and lib['website'].count("/") >= 4:
             github_url = github_url.format(
@@ -296,16 +297,18 @@ def sync_arduino_libs():
                         "{branch}/library.properties".format(
                             user_and_repo=urlparse(github_url).path,
                             branch=default_branch))
+            if conf_url.lower() in used_urls:
+                continue
             r = requests.get(conf_url)
             r.raise_for_status()
             approved = True
         except Exception:
-            conf_url = lib['website']
+            conf_url = github_url
 
-        query = db_session.query(func.count(1)).filter(
-            models.PendingLibs.conf_url == conf_url)
-        if query.scalar():
+        if conf_url.lower() in used_urls:
             continue
+        else:
+            used_urls.add(conf_url)
 
         # leave for moderation library with existing name
         if approved:
