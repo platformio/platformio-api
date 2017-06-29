@@ -346,8 +346,9 @@ class LibSyncerBase(object):
             else:
                 dbitems = dbitems.filter(_model.name.in_(items)).all()
 
-        # assert if invalid items
-        assert len(items) == len(dbitems)
+        # check for invalid items
+        # assert len(items) == len(dbitems)
+
         # update items in DB
         setattr(self.lib, what, dbitems)
         # save in string format for FTS
@@ -706,8 +707,8 @@ class ArduinoLibSyncer(LibSyncerBase):
         email = None
         for ldel, rdel in [("<", ">"), ("(", ")")]:
             if ldel in author and rdel in author:
-                name, email = author.split(ldel, 2)
-                email = email.replace(rdel, "")
+                name = author[:author.index(ldel)]
+                email = author[author.index(ldel) + 1:author.index(rdel)]
         return (name.strip(), email.strip() if email else None)
 
 
