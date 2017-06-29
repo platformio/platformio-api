@@ -707,8 +707,8 @@ class ArduinoLibSyncer(LibSyncerBase):
         email = None
         for ldel, rdel in [("<", ">"), ("(", ")")]:
             if ldel in author and rdel in author:
-                name, email = author.split(ldel, 2)
-                email = email.replace(rdel, "")
+                name = author[:author.index(ldel)]
+                email = author[author.index(ldel) + 1:author.index(rdel)]
         return (name.strip(), email.strip() if email else None)
 
 
