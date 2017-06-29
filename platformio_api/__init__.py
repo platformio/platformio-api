@@ -18,7 +18,7 @@ import os
 from time import tzset
 
 
-VERSION = (1, 17, 4)
+VERSION = (1, 17, 5)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
@@ -29,7 +29,7 @@ __author__ = "Ivan Kravets"
 __email__ = "me@ikravets.com"
 
 __license__ = "MIT License"
-__copyright__ = "Copyright (C) 2014-2015 Ivan Kravets"
+__copyright__ = "Copyright (C) 2014-2017 Ivan Kravets"
 
 config = dict(
     SQLALCHEMY_DATABASE_URI=None,
