@@ -346,8 +346,9 @@ class LibSyncerBase(object):
             else:
                 dbitems = dbitems.filter(_model.name.in_(items)).all()
 
-        # assert if invalid items
-        assert len(items) == len(dbitems)
+        # check for invalid items
+        # assert len(items) == len(dbitems)
+
         # update items in DB
         setattr(self.lib, what, dbitems)
         # save in string format for FTS
