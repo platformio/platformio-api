@@ -146,7 +146,7 @@ class LibSyncerBase(object):
 
     def get_version(self):
         version = dict(
-            name=str(self.config.get("version", None)),
+            name=str(self.config.get("version", "")),
             released=datetime.utcnow())
 
         if self.vcsclient:
