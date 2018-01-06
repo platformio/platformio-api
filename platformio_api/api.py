@@ -111,7 +111,7 @@ class LibSearchAPI(APIBase):
 
         for data in query.all():
             (lib_id, lib_name, lib_description, lib_keywords, authornames,
-             dlmonth, example_nums, updated, frameworkslist,
+             dllifetime, example_nums, updated, frameworkslist,
              platformslist) = data
             items.append(
                 dict(
@@ -124,7 +124,8 @@ class LibSearchAPI(APIBase):
                         frameworkslist, self.api_version == 1),
                     platforms=util.parse_namedtitled_list(
                         platformslist, self.api_version == 1),
-                    dlmonth=dlmonth,
+                    dllifetime=dllifetime,
+                    dlmonth=dllifetime,  # FIXME: Remove later
                     examplenums=example_nums,
                     updated=updated.strftime("%Y-%m-%dT%H:%M:%SZ")))
         return dict(
@@ -223,7 +224,7 @@ class LibSearchAPI(APIBase):
             query = db_session.query(
                 models.LibFTS.lib_id, models.LibFTS.name,
                 models.LibFTS.description, models.LibFTS.keywords,
-                models.LibFTS.authornames, models.LibDLStats.month,
+                models.LibFTS.authornames, models.LibDLStats.lifetime,
                 models.Libs.example_nums, models.Libs.updated,
                 models.LibFTS.frameworkslist, models.LibFTS.platformslist)
 
@@ -231,7 +232,7 @@ class LibSearchAPI(APIBase):
         query = self._apply_filters_to_query(query, is_count)
 
         if not self.search_query['words'] and not is_count:
-            query = query.order_by(models.LibDLStats.month.desc(),
+            query = query.order_by(models.LibDLStats.lifetime.desc(),
                                    models.LibFTS.name)
         return query
 
@@ -366,7 +367,7 @@ class LibInfoAPI(APIBase):
             result[k] = getattr(lib.fts, k)
         result['keywords'] = lib.fts.keywords.split(",")
 
-        for k in ("day", "week", "month"):
+        for k in ("lifetime", "day", "week", "month"):
             result['dlstats'][k] = getattr(lib.dlstats, k)
 
         # examples
@@ -465,13 +466,14 @@ class LibDownloadAPI(APIBase):
         try:
             query = db_session.query(models.LibDLLog).filter(
                 models.LibDLLog.lib_id == lib_id,
-                models.LibDLLog.date > datetime.utcnow() - timedelta(days=30),
+                models.LibDLLog.date > datetime.utcnow() - timedelta(hours=1),
                 models.LibDLLog.ip == ip_int)
             item = query.one()
             item.date = datetime.utcnow()
         except NoResultFound:
             db_session.query(models.LibDLStats).filter(
                 models.LibDLStats.lib_id == lib_id).update({
+                    models.LibDLStats.lifetime: models.LibDLStats.lifetime + 1,
                     models.LibDLStats.day: models.LibDLStats.day + 1,
                     models.LibDLStats.week: models.LibDLStats.week + 1,
                     models.LibDLStats.month: models.LibDLStats.month + 1
