@@ -16,7 +16,7 @@ from datetime import datetime
 
 from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, String, Text,
                         UniqueConstraint)
-from sqlalchemy.dialects.mysql import INTEGER, SMALLINT, VARCHAR
+from sqlalchemy.dialects.mysql import BIGINT, INTEGER, SMALLINT, VARCHAR
 from sqlalchemy.orm import relationship
 
 from platformio_api.database import Base
@@ -177,6 +177,7 @@ class LibDLStats(Base):
 
     lib_id = Column(
         INTEGER(unsigned=True), ForeignKey("libs.id"), primary_key=True)
+    lifetime = Column(BIGINT(unsigned=True), nullable=False, default=0)
     day = Column(INTEGER(unsigned=True), nullable=False, default=0)
     week = Column(INTEGER(unsigned=True), nullable=False, default=0)
     month = Column(INTEGER(unsigned=True), nullable=False, default=0)
