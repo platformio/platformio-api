@@ -109,9 +109,9 @@ class LibSyncerBase(object):
             raise InvalidLibConf(
                 "The 'name, keywords and description' fields are required")
 
-        if (config.get("dependencies") and
-                not (isinstance(config['dependencies'], list) or
-                     isinstance(config['dependencies'], dict))):
+        if (config.get("dependencies")
+                and not (isinstance(config['dependencies'], list)
+                         or isinstance(config['dependencies'], dict))):
             raise InvalidLibConf("The 'dependencies' field is invalid")
 
         # if github- or mbed-based project
@@ -132,8 +132,8 @@ class LibSyncerBase(object):
             raise InvalidLibConf("The 'authors' field is required")
         elif not all(["name" in item for item in authors]):
             raise InvalidLibConf("An each author should have 'name' property")
-        elif ("repository" in config and
-              config['repository'].get("type", None) in ("git", "svn")):
+        elif ("repository" in config
+              and config['repository'].get("type", None) in ("git", "svn")):
             return config
 
         # if self-hosted
@@ -146,7 +146,8 @@ class LibSyncerBase(object):
 
     def get_version(self):
         version = dict(
-            name=self.config.get("version", None), released=datetime.utcnow())
+            name=str(self.config.get("version", "")),
+            released=datetime.utcnow())
 
         if self.vcsclient:
             path = None
@@ -158,8 +159,8 @@ class LibSyncerBase(object):
                 version['name'] = commit['sha'][:10]
             version['released'] = commit['date']
 
-        if (version['name'] and
-                re.match(r"^[a-z0-9\.\-\+]+$", version['name'], re.I)):
+        if (version['name']
+                and re.match(r"^[a-z0-9\.\-\+]+$", version['name'], re.I)):
             return version
         else:
             raise InvalidLibVersion(version['name'])
@@ -398,7 +399,8 @@ class LibSyncerBase(object):
             raise PlatformioAPIException()
 
         return all(
-            [self._export_exclude(src_dir), self._export_include(src_dir)])
+            [self._export_exclude(src_dir),
+             self._export_include(src_dir)])
 
     def _export_exclude(self, src_dir):
         exclist = self.config.get("export", {}).get("exclude", [])
@@ -556,8 +558,9 @@ class LibSyncerBase(object):
             for old_file_path in get_c_sources(repo_dir):
                 if isdir(old_file_path):
                     continue
-                new_file_path = join(actual_examples_dir, "%s_%s" %
-                                     (repo_name, basename(old_file_path)))
+                new_file_path = join(actual_examples_dir,
+                                     "%s_%s" % (repo_name,
+                                                basename(old_file_path)))
                 copy(old_file_path, new_file_path)
                 files.append(new_file_path)
         return files
@@ -631,6 +634,7 @@ class ArduinoLibSyncer(LibSyncerBase):
             "sam": "atmelsam",
             "samd": "atmelsam",
             "esp8266": "espressif8266",
+            "esp32": "espressif32",
             "arc32": "intel_arc32"
         }
         for arch in manifest.get("architectures", "").split(","):
@@ -692,7 +696,8 @@ class ArduinoLibSyncer(LibSyncerBase):
             "repository": repository,
             "homepage": homepage,
             "export": {
-                "include": include,
+                "include":
+                include,
                 "exclude":
                 ["extras", "docs", "tests", "test", "*.doxyfile", "*.pdf"]
             }
@@ -735,8 +740,8 @@ class YottaLibSyncer(LibSyncerBase):
         repository = manifest.get("repository")
         if not repository or repository.get("url", "").startswith("git@"):
             assert "githubusercontent.com" in manifest_url
-            username, reponame, _ = urlparse(manifest_url).path[1:].split("/",
-                                                                          2)
+            username, reponame, _ = urlparse(manifest_url).path[1:].split(
+                "/", 2)
             repository = {
                 "type": "git",
                 "url": "https://github.com/%s/%s" % (username, reponame)
