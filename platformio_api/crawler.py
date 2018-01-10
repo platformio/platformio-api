@@ -430,7 +430,7 @@ class LibSyncerBase(object):
                                 makedirs(dirname(dstpath))
                             copy(item, dstpath)
                         else:
-                            copytree(item, dstpath, symlinks=True)
+                            copytree(item, dstpath, symlinks=False)
             # if "include" is a string then use it like a "mount" point
             elif isinstance(inclist, basestring):
                 for item in glob(join(src_dir, inclist)):
@@ -443,11 +443,11 @@ class LibSyncerBase(object):
                             if isfile(itempath):
                                 copy(itempath, dstpath)
                             else:
-                                copytree(itempath, dstpath, symlinks=True)
+                                copytree(itempath, dstpath, symlinks=False)
 
             # replace src_dir with filtered content
             rmtree(src_dir)
-            copytree(tmp_dir, src_dir, symlinks=True)
+            copytree(tmp_dir, src_dir, symlinks=False)
         finally:
             if isdir(tmp_dir):
                 rmtree(tmp_dir)
