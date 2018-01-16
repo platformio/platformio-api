@@ -635,7 +635,8 @@ class ArduinoLibSyncer(LibSyncerBase):
             "samd": "atmelsam",
             "esp8266": "espressif8266",
             "esp32": "espressif32",
-            "arc32": "intel_arc32"
+            "arc32": "intel_arc32",
+            "stm32": "ststm32"
         }
         for arch in manifest.get("architectures", "").split(","):
             arch = arch.strip()
