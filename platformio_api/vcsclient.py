@@ -26,8 +26,7 @@ import requests
 from git import Repo
 from github import Github, GithubObject
 
-from platformio_api import config
-from platformio_api.util import download_file, extract_archive
+from platformio_api import config, util
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class VCSClientFactory(object):
         assert type_ in ("git", "svn", "hg")
         if "github.com/" in url:
             type_ = "github"
-        if "developer.mbed.org" in url:
+        if util.is_mbed_repository(url):
             type_ = "mbed"
         if "bitbucket.org" in url:
             type_ = "bitbucket"
@@ -72,8 +71,8 @@ class VCSBaseClient(object):
     def _download_and_unpack_archive(self, url, destination_dir):
         arch_path = mkstemp(".tar.gz")[1]
         try:
-            download_file(url, arch_path)
-            extract_archive(arch_path, destination_dir)
+            util.download_file(url, arch_path)
+            util.extract_archive(arch_path, destination_dir)
 
             items = listdir(destination_dir)
             subdir = None
