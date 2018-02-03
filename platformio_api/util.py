@@ -171,3 +171,7 @@ def parse_namedtitled_list(ntlist, only_names=False):
         else:
             items.append(dict(name=name, title=title))
     return items
+
+
+def is_mbed_repository(url):
+    return ".mbed.org/" in url or ".mbed.com/" in url

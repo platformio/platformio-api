@@ -34,7 +34,6 @@ from platformio_api import models, util
 from platformio_api.database import db_session
 from platformio_api.exception import (InvalidLibConf, InvalidLibVersion,
                                       PlatformioAPIException)
-from platformio_api.util import get_c_sources
 from platformio_api.vcsclient import VCSClientFactory
 
 logger = logging.getLogger(__name__)
@@ -118,9 +117,9 @@ class LibSyncerBase(object):
         if "repository" in config:
             type = config['repository'].get("type", None)
             url = config['repository'].get("url", "")
-            if (type == "git" and "github.com" in url) \
-                    or (type == "hg" and "developer.mbed.org" in url)  \
-                    or (type in ["hg", "git"] and "bitbucket.org" in url):
+            if ((type == "git" and "github.com" in url) or
+                (type == "hg" and util.is_mbed_repository(url))
+                    or (type in ["hg", "git"] and "bitbucket.org" in url)):
                 return config
 
         # if CVS-based
@@ -540,7 +539,7 @@ class LibSyncerBase(object):
             if not isinstance(exmglobs, list):
                 exmglobs = [exmglobs]
             repo_url = self.config.get('repository', {}).get("url", "")
-            if "developer.mbed.org" in repo_url:
+            if util.is_mbed_repository(repo_url):
                 exmfiles = self._fetch_mbed_example_files(exmglobs, tmp_dir)
             else:
                 for fmask in exmglobs:
@@ -555,7 +554,7 @@ class LibSyncerBase(object):
             repo_name = client.url.split('/')[-2]
             repo_dir = mkdtemp(dir=tmp_dir)
             client.clone(repo_dir)
-            for old_file_path in get_c_sources(repo_dir):
+            for old_file_path in util.get_c_sources(repo_dir):
                 if isdir(old_file_path):
                     continue
                 new_file_path = join(actual_examples_dir,
@@ -635,7 +634,8 @@ class ArduinoLibSyncer(LibSyncerBase):
             "samd": "atmelsam",
             "esp8266": "espressif8266",
             "esp32": "espressif32",
-            "arc32": "intel_arc32"
+            "arc32": "intel_arc32",
+            "stm32": "ststm32"
         }
         for arch in manifest.get("architectures", "").split(","):
             arch = arch.strip()
