@@ -1,12 +1,9 @@
-import sys
 import os
 import shutil
 import subprocess
 import logging
 from time import sleep
 from tempfile import mkdtemp
-from zipfile import ZipFile, BadZipfile
-import click
 import requests
 from platformio_api import util
 from github import Github
@@ -93,7 +90,7 @@ def check_libs(lib_urls):
                     results.append(lib_url + ".json")
                 else:
                     results.append(lib_url + ".properties")
-        except (BadZipfile, WindowsError) as e:
+        except WindowsError as e:
             logger.info(e)
         finally:
             shutil.rmtree(unzip_folder)
