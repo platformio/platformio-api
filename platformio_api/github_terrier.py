@@ -106,7 +106,3 @@ def register_new_libs(new_libs):
         logger.info(new_lib)
         if not DEBUG:
             subprocess.call(["platformio", "lib", "register", new_lib])
-
-
-
-

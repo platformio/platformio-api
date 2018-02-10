@@ -102,13 +102,12 @@ def purge_cache():
 def githubterrier(search_query, min_repo_stars):
     github_login = config['GITHUB_LOGIN']
     github_password = config['GITHUB_PASSWORD']
-    gh_list = github_terrier.get_github_libs(search_query, github_login, github_password,
-                              min_repo_stars)
+    gh_list = github_terrier.get_github_libs(search_query, github_login,
+                                             github_password, min_repo_stars)
     pio_list = github_terrier.get_pio_libs()
     new_found_libs = github_terrier.find_new_libs(gh_list, pio_list)
     new_libs = github_terrier.check_libs(new_found_libs)
     github_terrier.register_new_libs(new_libs)
-
 
 
 def main():
