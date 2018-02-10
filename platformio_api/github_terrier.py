@@ -1,3 +1,17 @@
+# Copyright (c) 2014-present PlatformIO <contact@platformio.org>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import os
 import shutil
@@ -16,7 +30,7 @@ logger = logging.getLogger('git-terrier')
 logger.setLevel(20)
 
 
-#part 1: Get n-stars library
+# part 1: Get n-stars library
 def get_github_libs(search_request, gh_user, gh_password, gh_stars):
     g = Github(gh_user, gh_password, per_page=1000)
     search_result = g.search_code(search_request)
@@ -24,8 +38,9 @@ def get_github_libs(search_request, gh_user, gh_password, gh_stars):
     counter = 0
     for lib in search_result:
         if lib.repository.stargazers_count >= gh_stars:
-            url = "https://raw.githubusercontent.com/%s/%s/library.properties" % (
-                lib.repository.full_name, lib.repository.default_branch)
+            url = ("https://raw.githubusercontent.com"
+                   "/%s/%s/library.properties") % (
+                       lib.repository.full_name, lib.repository.default_branch)
             logger.info(url)
             result.append(url)
             if DEBUG:
@@ -35,7 +50,7 @@ def get_github_libs(search_request, gh_user, gh_password, gh_stars):
     return result
 
 
-#part 2: Get all PIO libs
+# part 2: Get all PIO libs
 def get_pio_libs():
     page = 1
     result = []
@@ -71,7 +86,7 @@ def find_new_libs(gh_results, pio_results):
     return set(gh_results).difference(pio_results)
 
 
-#part 4:ensure that found libs are arduino libs
+# part 4:ensure that found libs are arduino libs
 def check_libs(lib_urls):
     results = []
     for lib_url in lib_urls:
