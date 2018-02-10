@@ -108,15 +108,14 @@ def register_new_libs(new_libs):
             subprocess.call(["platformio", "lib", "register", new_lib])
 
 
-def apport():
+def main(search_query,min_repo_stars):
     github_login = config['GITHUB_LOGIN']
     github_password = config['GITHUB_PASSWORD']
-    search_query = 'name filename:library.properties  path:/'
-    min_repo_stars = 5
     gh_list = get_github_libs(search_query, github_login, github_password,
                               min_repo_stars)
     pio_list = get_pio_libs()
     new_found_libs = find_new_libs(gh_list, pio_list)
     new_libs = check_libs(new_found_libs)
     register_new_libs(new_libs)
-    logger.info("Done!")
+
+

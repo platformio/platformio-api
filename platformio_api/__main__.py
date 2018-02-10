@@ -20,7 +20,7 @@ from click import argument, echo, group, version_option
 from platformio_api import __version__, maintenance
 from platformio_api.database import sync_db
 from platformio_api.web import app
-import github_terrier 
+import github_terrier
 
 
 @group()
@@ -94,9 +94,12 @@ def optimisesyncperiod():
 def purge_cache():
     maintenance.purge_cache()
 
+
 @cli.command()
-def githubterrier():
-    github_terrier.apport()
+@argument('search_query', type=str, nargs=1)
+@argument('min_repo_stars', type=int, nargs=1)
+def githubterrier(search_query, min_repo_stars):
+    github_terrier.main(search_query, min_repo_stars)
 
 
 def main():
