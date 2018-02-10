@@ -8,7 +8,7 @@ from tempfile import mkdtemp
 from zipfile import ZipFile, BadZipfile
 import click
 import requests
-from platformio_api import config, util
+from platformio_api import util
 from github import Github
 
 DEBUG = False
@@ -108,14 +108,5 @@ def register_new_libs(new_libs):
             subprocess.call(["platformio", "lib", "register", new_lib])
 
 
-def main(search_query,min_repo_stars):
-    github_login = config['GITHUB_LOGIN']
-    github_password = config['GITHUB_PASSWORD']
-    gh_list = get_github_libs(search_query, github_login, github_password,
-                              min_repo_stars)
-    pio_list = get_pio_libs()
-    new_found_libs = find_new_libs(gh_list, pio_list)
-    new_libs = check_libs(new_found_libs)
-    register_new_libs(new_libs)
 
 
