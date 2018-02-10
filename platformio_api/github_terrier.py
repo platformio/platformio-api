@@ -1,12 +1,14 @@
+import logging
 import os
 import shutil
 import subprocess
-import logging
-from time import sleep
 from tempfile import mkdtemp
+from time import sleep
+
 import requests
-from platformio_api import util
+
 from github import Github
+from platformio_api import util
 
 DEBUG = False
 logging.basicConfig()
