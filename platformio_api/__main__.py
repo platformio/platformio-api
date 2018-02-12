@@ -97,13 +97,8 @@ def purge_cache():
 
 
 @cli.command()
-<<<<<<< HEAD
-@argument('search_query', type=str, nargs=1)
-@argument('min_repo_stars', type=int, nargs=1)
-=======
 @click.argument('search_query', type=str, nargs=1)
 @click.option('--min-repo-stars', type=int, default=5)
->>>>>>> 55986523f4e68bc9ced545d40d0ac0651376a624
 def githubterrier(search_query, min_repo_stars):
     gh_list = github_terrier.get_github_libs(
         search_query, config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'],
