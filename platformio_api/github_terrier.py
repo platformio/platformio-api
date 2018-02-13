@@ -11,16 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 import os
 import shutil
 import subprocess
 from tempfile import mkdtemp
 from time import sleep
+from urlparse import urlparse
 
 import requests
-from urlparse import urlparse
 from github import Github, enable_console_debug_logging
+
 from platformio_api import config, models, util
 from platformio_api.database import db_session
 
