@@ -18,6 +18,7 @@ import shutil
 import subprocess
 from tempfile import mkdtemp
 from urlparse import urlparse
+
 from github import Github
 
 from platformio_api import models, util
