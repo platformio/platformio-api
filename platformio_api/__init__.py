@@ -15,10 +15,9 @@
 import json
 import logging.config
 import os
-from time import tzset
 
 
-VERSION = (1, 18, 1)
+VERSION = (1, 19, 0)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
@@ -54,4 +53,8 @@ logging.config.dictConfig(config['LOGGING'])
 
 # setup time zone to UTC globally
 os.environ['TZ'] = "+00:00"
-tzset()
+try:
+    from time import tzset
+    tzset()
+except ImportError:
+    pass

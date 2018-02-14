@@ -14,16 +14,17 @@
 
 from sys import exit as sys_exit
 
+import click
 import requests
-from click import argument, echo, group, version_option
 
-from platformio_api import __version__, maintenance
+from platformio_api import __version__, config, maintenance
 from platformio_api.database import sync_db
+from platformio_api.github_terrier import GithubTerrier
 from platformio_api.web import app
 
 
-@group()
-@version_option(__version__, prog_name="PlatformIO-API")
+@click.group()
+@click.version_option(__version__, prog_name="PlatformIO-API")
 def cli():
     pass
 
@@ -31,7 +32,7 @@ def cli():
 @cli.command()
 def syncdb():
     sync_db()
-    echo("The database has been successfully synchronized!")
+    click.echo("The database has been successfully synchronized!")
 
 
 @cli.command()
@@ -45,7 +46,7 @@ def synclibs():
 
 
 @cli.command()
-@argument('lib_id', type=int)
+@click.argument('lib_id', type=int)
 def sync_lib(lib_id):
     maintenance.sync_lib_by_id(lib_id)
 
@@ -66,20 +67,20 @@ def runserver():
 
 
 @cli.command()
-@argument('lib_id', type=int)
+@click.argument('lib_id', type=int)
 def deletelib(lib_id):
     maintenance.delete_library(lib_id)
 
 
 @cli.command()
-@argument('version_ids', type=int, nargs=-1)
+@click.argument('version_ids', type=int, nargs=-1)
 def deletelibversion(version_ids):
     for version_id in version_ids:
         maintenance.delete_lib_version(version_id)
 
 
 @cli.command()
-@argument("keep_versions", type=int)
+@click.option("--keep-versions", type=int)
 def cleanuplibversions(keep_versions):
     maintenance.cleanup_lib_versions(keep_versions)
 
@@ -92,6 +93,15 @@ def optimisesyncperiod():
 @cli.command()
 def purge_cache():
     maintenance.purge_cache()
+
+
+@cli.command()
+@click.argument('search_query', type=str, nargs=1)
+@click.option('--min-repo-stars', type=int, default=5)
+def githubterrier(search_query, min_repo_stars):
+    gh = GithubTerrier(config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'],
+                       search_query, min_repo_stars)
+    gh.run()
 
 
 def main():

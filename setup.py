@@ -33,7 +33,8 @@ setup(
         "SQLAlchemy<1.2",
         "requests",
         "PyGithub>=1.26,<2",
-        "GitPython"
+        "GitPython",
+        "platformio"
     ],
     packages=find_packages(),
     entry_points={
