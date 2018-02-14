@@ -90,9 +90,10 @@ def sync_lib(item):
     with util.rollback_on_exception(db_session, logger):
         ls = LibSyncerFactory.new(item)
         sync_succeeded = ls.sync()
-        if sync_succeeded:
-            item.synced = datetime.utcnow()
-    item.active = bool(sync_succeeded)
+
+    item.sync_failures = 0 if sync_succeeded else item.sync_failures + 1
+    item.synced = datetime.utcnow() + timedelta(days=item.sync_failures)
+
     db_session.commit()
 
 
