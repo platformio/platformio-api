@@ -21,7 +21,7 @@ from platformio_api import __version__, maintenance
 from platformio_api.database import sync_db
 from platformio_api.web import app
 from platformio_api import config
-from platformio_api import github_terrier
+from platformio_api.github_terrier import GithubTerrier
 
 
 @click.group()
@@ -100,13 +100,9 @@ def purge_cache():
 @click.argument('search_query', type=str, nargs=1)
 @click.option('--min-repo-stars', type=int, default=5)
 def githubterrier(search_query, min_repo_stars):
-    gh_list = github_terrier.get_github_libs(
-        search_query, config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'],
-        min_repo_stars)
-    pio_list = github_terrier.get_pio_libs()
-    new_found_libs = github_terrier.find_new_libs(gh_list, pio_list)
-    new_libs = github_terrier.check_libs(new_found_libs)
-    github_terrier.register_new_libs(new_libs)
+    gh = GithubTerrier(config['GITHUB_LOGIN'], config['GITHUB_PASSWORD'],
+                       search_query, min_repo_stars)
+    gh.run()
 
 
 def main():
