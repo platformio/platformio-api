@@ -22,7 +22,7 @@ from github import Github
 
 from platformio_api import models, util
 from platformio_api.database import db_session
-DEBUG = True
+
 logging.basicConfig()
 logger = logging.getLogger('git-terrier')
 logger.setLevel(20)
