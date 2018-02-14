@@ -17,7 +17,7 @@ import logging.config
 import os
 
 
-VERSION = (1, 19, 0)
+VERSION = (1, 20, 0)
 __version__ = ".".join([str(s) for s in VERSION])
 
 __title__ = "platformio-api"
