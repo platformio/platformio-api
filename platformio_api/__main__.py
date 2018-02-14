@@ -14,14 +14,13 @@
 
 from sys import exit as sys_exit
 
-import requests
 import click
+import requests
 
-from platformio_api import __version__, maintenance
+from platformio_api import __version__, config, maintenance
 from platformio_api.database import sync_db
-from platformio_api.web import app
-from platformio_api import config
 from platformio_api.github_terrier import GithubTerrier
+from platformio_api.web import app
 
 
 @click.group()
