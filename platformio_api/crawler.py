@@ -219,7 +219,7 @@ class LibSyncerBase(object):
             if isdir(src_dir):
                 rmtree(src_dir)
 
-        return self.config['id']
+        return True
 
     def sync_version(self, version):
         try:

@@ -89,12 +89,14 @@ class Libs(Base):
     latest_version_id = Column(INTEGER(unsigned=True))
     conf_url = Column(String(200), nullable=False)
     conf_sha1 = Column(String(40))
-    example_nums = Column(SMALLINT(unsigned=True))
+    example_nums = Column(SMALLINT(unsigned=True), nullable=False, default=0)
     added = Column(
         DateTime, nullable=False, default=datetime.utcnow, index=True)
     updated = Column(
         DateTime, nullable=False, default=datetime.utcnow, index=True)
     synced = Column(DateTime, nullable=False, default=datetime.utcnow)
+    sync_failures = Column(
+        SMALLINT(unsigned=True), nullable=False, default=0)
     active = Column(Boolean, nullable=False, default=True)
 
     # relationships
