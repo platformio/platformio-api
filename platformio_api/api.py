@@ -138,6 +138,7 @@ class LibSearchAPI(APIBase):
         quote = "\""
         words = []
         params = {
+            "ids": [],
             "authors": [],
             "keywords": [],
             "frameworks": [],
@@ -245,6 +246,8 @@ class LibSearchAPI(APIBase):
             for i, item in enumerate(_params.get("platforms")):
                 _params['platforms'][i] = "espressif8266"
 
+        if _params.get("ids"):
+            query = query.filter(models.LibFTS.lib_id.in_(_params['ids']))
         if _params.get("names"):
             query = query.filter(models.LibFTS.name.in_(_params['names']))
         if _params.get("headers"):
