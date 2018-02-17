@@ -188,8 +188,8 @@ class GithubVCSClient(VCSBaseClient):
     def get_last_commit(self, path=None):
         path = path or GithubObject.NotSet
         commit = None
-        revision = (self.tag or self.branch or self.default_branch or
-                    GithubObject.NotSet)
+        revision = (self.tag or self.branch or self.default_branch
+                    or GithubObject.NotSet)
         folder_depth = 20
         while folder_depth:
             folder_depth -= 1
@@ -217,8 +217,8 @@ class GithubVCSClient(VCSBaseClient):
 
     def clone(self, destination_dir):
         url = ("https://codeload.github.com/%s/legacy.tar.gz/%s" %
-               (self._repo.full_name, self.tag or self.branch or
-                self.default_branch))
+               (self._repo.full_name,
+                self.tag or self.branch or self.default_branch))
         self._download_and_unpack_archive(url, destination_dir)
 
 
@@ -231,18 +231,22 @@ class MbedVCSClient(VCSBaseClient):
     def get_last_commit(self, path=None):
         if self._last_commit is not None:
             return self._last_commit
-        history_url = self.url + "shortlog"
-        logger.debug("Fetching commit metadata on URL: %s" % history_url)
-        r = requests.get(history_url)
+        lastrev_url = self.url + "rev/"
+        logger.debug("Fetching last revision on URL: %s" % lastrev_url)
+        r = requests.get(lastrev_url)
         assert 200 == r.status_code, \
             "HTTP status code is not OK. Returned code: %s" % r.status_code
         html = r.text
-        sha = re.search("\d+:(?P<sha>[a-f0-9]{12})", html)
-        date_string = re.search("\d{2} [a-zA-Z]{3} [0-9]{4}", html).group()
-        date = datetime.strptime(date_string, "%d %b %Y").date()
+        sha = re.search(r"Revision \d+:([a-f\d]{12}),", html).group(1)
+        # Mar 21 07:41:52 2016 +0000
+        date_string = re.search(
+            r"([a-z]{3} [a-z]{3} \d{2} [\d:]{8} \d{4}) \+0000", html,
+            flags=re.I).group(1)
+        # Apr 01 01:28:35 2011
+        date = datetime.strptime(date_string, "%c")
         assert sha and date, "Unable to fetch commit metadata. " \
                              "SHA: %s. Date: %s." % (sha, date)
-        self._last_commit = dict(sha=sha.groupdict()['sha'], date=date)
+        self._last_commit = dict(sha=sha, date=date)
         return self._last_commit
 
     def clone(self, destination_dir):
@@ -292,7 +296,8 @@ class BitbucketVCSClient(VCSBaseClient):
 
         response = requests.get(self.TAGS_URL % dict(
             owner=self._owner,
-            repo_slug=self._repo_slug, ))
+            repo_slug=self._repo_slug,
+        ))
         assert 200 == response.status_code, "Bitbucket API request failed"
         _tag = None
         for value in response.json()['values']:
@@ -310,7 +315,8 @@ class BitbucketVCSClient(VCSBaseClient):
         response = requests.get(self.COMMITS_URL % dict(
             owner=self._owner,
             repo_slug=self._repo_slug,
-            revision=revision, ))
+            revision=revision,
+        ))
         assert 200 == response.status_code, "Bitbucket API request failed"
 
         commit = response.json()["values"][0]
@@ -324,12 +330,14 @@ class BitbucketVCSClient(VCSBaseClient):
         url = self.ARCHIVE_URL % dict(
             owner=self._owner,
             repo_slug=self._repo_slug,
-            revision=revision, )
+            revision=revision,
+        )
         self._download_and_unpack_archive(url, destination_dir)
 
     def get_main_branch(self):
         response = requests.get(self.MAIN_BRANCH_URL % dict(
             owner=self._owner,
-            repo_slug=self._repo_slug, ))
+            repo_slug=self._repo_slug,
+        ))
         assert 200 == response.status_code, "Bitbucket API request failed"
         return response.json()["name"]
