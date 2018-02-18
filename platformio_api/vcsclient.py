@@ -229,6 +229,14 @@ class MbedVCSClient(VCSBaseClient):
         self._last_commit = None
 
     def get_last_commit(self, path=None):
+        try:
+            self._last_commit = self._get_last_commit_by_ref(path)
+        except:
+            self._last_commit = self._get_last_commit_by_home(path)
+        assert self._last_commit
+        return self._last_commit
+
+    def _get_last_commit_by_ref(self, path=None):
         if self._last_commit is not None:
             return self._last_commit
         lastrev_url = self.url + "rev/"
@@ -240,14 +248,30 @@ class MbedVCSClient(VCSBaseClient):
         sha = re.search(r"Revision \d+:([a-f\d]{12}),", html).group(1)
         # Mar 21 07:41:52 2016 +0000
         date_string = re.search(
-            r"([a-z]{3} [a-z]{3} \d{2} [\d:]{8} \d{4}) \+0000", html,
+            r"([a-z]{3} [a-z]{3} \d{2} [\d:]{8} \d{4}) \+0000",
+            html,
             flags=re.I).group(1)
         # Apr 01 01:28:35 2011
         date = datetime.strptime(date_string, "%c")
-        assert sha and date, "Unable to fetch commit metadata. " \
-                             "SHA: %s. Date: %s." % (sha, date)
-        self._last_commit = dict(sha=sha, date=date)
-        return self._last_commit
+        assert sha and date
+        return dict(sha=sha, date=date)
+
+    def _get_last_commit_by_home(self, path=None):
+        if self._last_commit is not None:
+            return self._last_commit
+        logger.debug("Fetching last revision on URL: %s" % self.url)
+        r = requests.get(self.url)
+        assert 200 == r.status_code, \
+            "HTTP status code is not OK. Returned code: %s" % r.status_code
+        html = r.text
+        sha = re.search(r"Files at revision \d+:([a-f\d]{12})", html).group(1)
+        # 2014-03-08T21:44:56+00:00
+        date_string = re.search(r'="([\d\-]{10}T[\d:]{8})\+00:00"',
+                                html).group(1)
+        # 2014-03-08T21:44:56
+        date = datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S")
+        assert sha and date
+        return dict(sha=sha, date=date)
 
     def clone(self, destination_dir):
         revision = self.tag or self.get_last_commit()['sha']
