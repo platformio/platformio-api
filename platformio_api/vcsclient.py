@@ -246,13 +246,13 @@ class MbedVCSClient(VCSBaseClient):
             "HTTP status code is not OK. Returned code: %s" % r.status_code
         html = r.text
         sha = re.search(r"Revision \d+:([a-f\d]{12}),", html).group(1)
-        # Mar 21 07:41:52 2016 +0000
+        # Fri Nov 18 11:10:04 2016 -0600
         date_string = re.search(
-            r"([a-z]{3} [a-z]{3} \d{2} [\d:]{8} \d{4}) \+0000",
+            r"([a-z]{3} [a-z]{3} \d{2} [\d:]{8} \d{4}) (?:\+|\-)\d{4}",
             html,
             flags=re.I).group(1)
-        # Apr 01 01:28:35 2011
-        date = datetime.strptime(date_string, "%c")
+        # Fri Nov 18 11:10:04 2016
+        date = datetime.strptime(date_string, "%a %b %d %H:%M:%S %Y")
         assert sha and date
         return dict(sha=sha, date=date)
 
