@@ -79,7 +79,7 @@ class Keywords(Base):
     __tablename__ = "keywords"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(String(20), unique=True, nullable=False)
+    name = Column(String(30), unique=True, nullable=False)
 
 
 class Libs(Base):
