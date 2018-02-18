@@ -553,7 +553,11 @@ class LibSyncerBase(object):
             client = VCSClientFactory.newClient("hg", url)
             repo_name = client.url.split('/')[-2]
             repo_dir = mkdtemp(dir=tmp_dir)
-            client.clone(repo_dir)
+            try:
+                client.clone(repo_dir)
+            except:
+                logger.warn("Invalid mbed example %s" % url)
+                continue
             for old_file_path in util.get_c_sources(repo_dir):
                 if isdir(old_file_path):
                     continue
