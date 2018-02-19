@@ -117,8 +117,8 @@ class LibSyncerBase(object):
         if "repository" in config:
             type = config['repository'].get("type", None)
             url = config['repository'].get("url", "")
-            if ((type == "git" and "github.com" in url) or
-                (type == "hg" and util.is_mbed_repository(url))
+            if ((type == "git" and "github.com" in url)
+                    or (type == "hg" and util.is_mbed_repository(url))
                     or (type in ["hg", "git"] and "bitbucket.org" in url)):
                 return config
 
@@ -673,16 +673,18 @@ class ArduinoLibSyncer(LibSyncerBase):
 
         #####
         repository = {"type": "git", "url": None}
-        assert "githubusercontent.com" in manifest_url
-        username, reponame, _ = urlparse(manifest_url).path[1:].split("/", 2)
-        repository['url'] = "https://github.com/%s/%s" % (username, reponame)
+        repo_parse = urlparse(manifest_url)
+        username, reponame, _ = repo_parse.path[1:].split("/", 2)
+        repository['url'] = "%s://%s/%s/%s" % (
+            repo_parse.scheme, "github.com"
+            if repo_parse.netloc == "raw.githubusercontent.com" else
+            repo_parse.netloc, username, reponame)
 
         #####
         include = None
-        if "githubusercontent.com" in manifest_url:
-            path_parts = urlparse(manifest_url).path[1:].split("/")
-            if len(path_parts) > 4:
-                include = "/".join(path_parts[3:-1])
+        path_parts = repo_parse.path[1:].split("/")
+        if len(path_parts) > (4 if "github.com" in repository['url'] else 5):
+            include = "/".join(path_parts[3:-1])
 
         #####
         homepage = None
