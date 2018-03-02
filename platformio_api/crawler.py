@@ -309,9 +309,9 @@ class LibSyncerBase(object):
         for item in keywords:
             if not item or item in result:
                 continue
-            if len(item) >= 20:
+            if len(item) >= 30:
                 for _item in item.split():
-                    _item = _item.strip()
+                    _item = _item.strip()[:30]
                     if _item not in result:
                         result.append(_item)
             else:
@@ -642,6 +642,7 @@ class ArduinoLibSyncer(LibSyncerBase):
             "stm32": "ststm32"
         }
         for arch in manifest.get("architectures", "").split(","):
+            assert "particle-" not in arch, "Particle is not supported yet"
             arch = arch.strip()
             if arch == "*":
                 platforms = "*"
