@@ -642,6 +642,7 @@ class ArduinoLibSyncer(LibSyncerBase):
             "stm32": "ststm32"
         }
         for arch in manifest.get("architectures", "").split(","):
+            assert "particle-" not in arch, "Particle is not supported yet"
             arch = arch.strip()
             if arch == "*":
                 platforms = "*"
