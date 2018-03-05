@@ -216,7 +216,7 @@ class LibFTS(Base):
     keywords = Column(String(255), nullable=False)
     headerslist = Column(Text(), nullable=False)
     authornames = Column(String(255), nullable=False)
-    frameworkslist = Column(String(255), nullable=False)
+    frameworkslist = Column(Text(), nullable=False)
     platformslist = Column(Text(), nullable=False)
 
 
