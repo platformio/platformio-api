@@ -67,9 +67,10 @@ def runserver():
 
 
 @cli.command()
-@click.argument('lib_id', type=int)
-def deletelib(lib_id):
-    maintenance.delete_library(lib_id)
+@click.argument('lib_ids', type=int, nargs=-1)
+def deletelibs(lib_ids):
+    for lib_id in lib_ids:
+        maintenance.delete_library(lib_id)
 
 
 @cli.command()
