@@ -232,9 +232,8 @@ class LibSearchAPI(APIBase):
         query = query.join(models.Libs, models.LibDLStats)
         query = self._apply_filters_to_query(query, is_count)
 
-        if not self.search_query['words'] and not is_count:
-            query = query.order_by(models.LibDLStats.lifetime.desc(),
-                                   models.LibFTS.name)
+        if not is_count:
+            query = query.order_by(models.LibDLStats.lifetime.desc())
         return query
 
     def _apply_filters_to_query(self, query, is_count=False):

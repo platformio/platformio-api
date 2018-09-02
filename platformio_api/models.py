@@ -95,8 +95,7 @@ class Libs(Base):
     updated = Column(
         DateTime, nullable=False, default=datetime.utcnow, index=True)
     synced = Column(DateTime, nullable=False, default=datetime.utcnow)
-    sync_failures = Column(
-        SMALLINT(unsigned=True), nullable=False, default=0)
+    sync_failures = Column(SMALLINT(unsigned=True), nullable=False, default=0)
     active = Column(Boolean, nullable=False, default=True)
 
     # relationships
@@ -179,7 +178,8 @@ class LibDLStats(Base):
 
     lib_id = Column(
         INTEGER(unsigned=True), ForeignKey("libs.id"), primary_key=True)
-    lifetime = Column(BIGINT(unsigned=True), nullable=False, default=0)
+    lifetime = Column(
+        BIGINT(unsigned=True), nullable=False, default=0, index=True)
     day = Column(INTEGER(unsigned=True), nullable=False, default=0)
     week = Column(INTEGER(unsigned=True), nullable=False, default=0)
     month = Column(INTEGER(unsigned=True), nullable=False, default=0)
