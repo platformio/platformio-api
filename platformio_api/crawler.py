@@ -165,7 +165,7 @@ class LibSyncerBase(object):
             raise InvalidLibVersion(version['name'])
 
     def calc_config_sha1(self):
-        return sha1(str(sorted(self.config.items()))).hexdigest()
+        return sha1(json.dumps(self.config, sort_keys=True)).hexdigest()
 
     def sync(self):
         if "version" in self.config and \
