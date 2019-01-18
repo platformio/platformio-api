@@ -43,7 +43,7 @@ class Authors(Base):
     __tablename__ = "authors"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(VARCHAR(50, binary=True), nullable=False, unique=True)
+    name = Column(VARCHAR(75, binary=True), nullable=False, unique=True)
     email = Column(String(50))
     url = Column(String(100))
 
