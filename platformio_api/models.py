@@ -52,8 +52,8 @@ class Frameworks(Base):
     __tablename__ = "frameworks"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(String(20), unique=True, nullable=False)
-    title = Column(String(20), nullable=False)
+    name = Column(String(30), unique=True, nullable=False)
+    title = Column(String(30), nullable=False)
 
 
 class Platforms(Base):
