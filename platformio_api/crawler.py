@@ -165,7 +165,7 @@ class LibSyncerBase(object):
             raise InvalidLibVersion(version['name'])
 
     def calc_config_sha1(self):
-        return sha1(str(sorted(self.config.items()))).hexdigest()
+        return sha1(json.dumps(self.config, sort_keys=True)).hexdigest()
 
     def sync(self):
         if "version" in self.config and \
@@ -673,19 +673,24 @@ class ArduinoLibSyncer(LibSyncerBase):
                 authors.append(dict(name=name, email=email, maintainer=True))
 
         #####
-        repository = {"type": "git", "url": None}
+        repository = {"type": "git", "url": manifest.get("url")}
         repo_parse = urlparse(manifest_url)
-        username, reponame, _ = repo_parse.path[1:].split("/", 2)
-        repository['url'] = "%s://%s/%s/%s" % (
-            repo_parse.scheme, "github.com"
-            if repo_parse.netloc == "raw.githubusercontent.com" else
-            repo_parse.netloc, username, reponame)
+        repo_path_tokens = repo_parse.path[1:].split("/")[:-1]
+        if "github" in repo_parse.netloc:
+            repository['url'] = "%s://github.com/%s" % (
+                repo_parse.scheme, "/".join(repo_path_tokens[:2]))
+        elif "raw" in repo_path_tokens:
+            repository['url'] = "%s://%s/%s" % (
+                repo_parse.scheme, repo_parse.netloc, "/".join(
+                    repo_path_tokens[:repo_path_tokens.index("raw")]))
 
         #####
         include = None
-        path_parts = repo_parse.path[1:].split("/")
-        if len(path_parts) > (4 if "github.com" in repository['url'] else 5):
-            include = "/".join(path_parts[3:-1])
+        if "github" in repo_parse.netloc:
+            include = "/".join(repo_path_tokens[3:]) or None
+        elif "raw" in repo_path_tokens:
+            include = "/".join(
+                repo_path_tokens[repo_path_tokens.index("raw") + 2:]) or None
 
         #####
         homepage = None

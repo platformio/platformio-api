@@ -124,7 +124,7 @@ class GitVCSClient(VCSBaseClient):
     def clone(self, destination_dir):
         if isdir(destination_dir):
             rmtree(destination_dir)
-        copytree(self._repo.working_tree_dir, destination_dir)
+        copytree(self._repo.working_tree_dir, destination_dir, symlinks=True)
         rmtree(join(destination_dir, ".git"))
 
     def get_last_commit(self, path=None):

@@ -43,7 +43,7 @@ class Authors(Base):
     __tablename__ = "authors"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(VARCHAR(50, binary=True), nullable=False, unique=True)
+    name = Column(VARCHAR(75, binary=True), nullable=False, unique=True)
     email = Column(String(50))
     url = Column(String(100))
 
@@ -52,8 +52,8 @@ class Frameworks(Base):
     __tablename__ = "frameworks"
 
     id = Column(INTEGER(unsigned=True), primary_key=True)
-    name = Column(String(20), unique=True, nullable=False)
-    title = Column(String(20), nullable=False)
+    name = Column(String(30), unique=True, nullable=False)
+    title = Column(String(30), nullable=False)
 
 
 class Platforms(Base):
