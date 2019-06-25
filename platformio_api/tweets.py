@@ -169,8 +169,7 @@ def _cache_tweet_media(username, item, output_dir, output_base_url):
             with open(cache_path, "wb") as fp:
                 for chunk in get_twitter_content(username, url, stream=True):
                     fp.write(chunk)
-        new_photos.append("%s/%s/%s" %
-                          (output_base_url, username, basename(cache_path)))
+        new_photos.append("%s/%s" % (output_base_url, basename(cache_path)))
 
     item['entries']['photos'] = new_photos
     return item

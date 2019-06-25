@@ -84,9 +84,9 @@ class PioStatsAPI(APIBase):
 class LatestTweetsAPI(APIBase):
 
     def __init__(self, username):
-        if username.lower() not in config['VALID_TWITTER_USERNAMES']:
+        self.username = username.strip().lower()
+        if self.username not in config['VALID_TWITTER_USERNAMES']:
             raise APIBadRequest("Unknown Twitter user name")
-        self.username = username
 
     def get_result(self):
         return tweets.parse_tweets(
