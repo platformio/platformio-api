@@ -34,6 +34,7 @@ setup(
         "requests",
         "PyGithub>=1.26,<2",
         "GitPython",
+        "beautifulsoup4",
         "platformio"
     ],
     packages=find_packages(),
