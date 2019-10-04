@@ -87,7 +87,7 @@ class VCSBaseClient(object):
                         copytree(
                             item_path,
                             join(destination_dir, item),
-                            symlinks=True)
+                            symlinks=False)
                 rmtree(subdir)
         finally:
             remove(arch_path)
@@ -124,7 +124,7 @@ class GitVCSClient(VCSBaseClient):
     def clone(self, destination_dir):
         if isdir(destination_dir):
             rmtree(destination_dir)
-        copytree(self._repo.working_tree_dir, destination_dir, symlinks=True)
+        copytree(self._repo.working_tree_dir, destination_dir, symlinks=False)
         rmtree(join(destination_dir, ".git"))
 
     def get_last_commit(self, path=None):
