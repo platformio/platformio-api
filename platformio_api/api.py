@@ -21,7 +21,7 @@ from sqlalchemy import and_, desc, distinct, func
 from sqlalchemy.sql import label
 from sqlalchemy.orm.exc import NoResultFound
 
-from platformio_api import config, crawler, models, tweets, util
+from platformio_api import config, crawler, models, util
 from platformio_api.database import Match, db_session
 from platformio_api.exception import APIBadRequest, APINotFound, InvalidLibConf
 
@@ -79,19 +79,6 @@ class PioStatsAPI(APIBase):
             frameworks=len(FrameworksAPI.get_result()),
             platforms=len(PlatformsAPI.get_result()))
         return result
-
-
-class LatestTweetsAPI(APIBase):
-
-    def __init__(self, username):
-        self.username = username.strip().lower()
-        if self.username not in config['VALID_TWITTER_USERNAMES']:
-            raise APIBadRequest("Unknown Twitter user name")
-
-    def get_result(self):
-        return tweets.parse_tweets(
-            self.username, join(config['DL_PIO_DIR'], "tweets", self.username),
-            join(config['DL_PIO_URL'], "tweets", self.username))
 
 
 class LibSearchAPI(APIBase):
