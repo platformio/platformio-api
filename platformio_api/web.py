@@ -101,11 +101,6 @@ def stats():
     return finalize_json_response(api.PioStatsAPI, {})
 
 
-@app.route("/tweets/<username>")
-def tweets(username):
-    return finalize_json_response(api.LatestTweetsAPI, {"username": username})
-
-
 @app.route("<apiver:re:(/v\d+)?/>lib/search")
 def lib_search(apiver):
     apiver = int(apiver[2:-1]) if "/v" in apiver else 1
