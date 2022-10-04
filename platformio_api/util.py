@@ -91,7 +91,29 @@ def create_archive(archive_path, source_dir):
 def extract_archive(archive_path, destination_dir):
     if archive_path.endswith(".tar.gz"):
         with tarfile.open(archive_path) as tar:
-            tar.extractall(destination_dir)
+            
+            import os
+            
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(tar, destination_dir)
     elif archive_path.endswith(".zip"):
         with zipfile.ZipFile(archive_path) as zip_:
             zip_.extractall(destination_dir)
